@@ -181,9 +181,11 @@ function renderTop(){
   $("#funnel").innerHTML=ETAPAS.map(e=>`<button class="stage ${filtro===e.k?"on":""}" data-k="${e.k}" aria-pressed="${filtro===e.k}"><span class="s">${e.s}</span><span class="n">${cont[e.k]}</span><span class="l">${e.l}</span></button>`).join("");
   const atras=rows.filter(r=>r.etapa==="entregue"&&r.prazoVideo&&!r.videoLink&&diasAte(r.prazoVideo)<0);
   const conferir=rows.filter(r=>r.etapa==="entregue"&&r.videoLink);
+  const usouVoucher=rows.filter(r=>r.etapa==="compra"&&r.voucher?.usado);
   const ab=$("#alertBox");let h="";
   if(atras.length)h+=`<div class="alert">${atras.length} vídeo${atras.length>1?"s":""} atrasado${atras.length>1?"s":""}: ${atras.map(r=>esc(primeiroNome(r.nome))).join(", ")} <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
   if(conferir.length)h+=`<div class="alert" style="background:var(--ok-soft);color:var(--ok);margin-top:8px">${conferir.length} vídeo${conferir.length>1?"s":""} enviado${conferir.length>1?"s":""} pelas afiliadas para conferir <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
+  if(usouVoucher.length)h+=`<div class="alert" style="background:var(--warn-soft);color:var(--warn);margin-top:8px">${usouVoucher.length===1?esc(primeiroNome(usouVoucher[0].nome))+" usou o voucher"+(usouVoucher[0].voucher.pedidoUso?" no pedido "+esc(usouVoucher[0].voucher.pedidoUso):""):usouVoucher.length+" afiliadas usaram o voucher"}: separar e enviar os looks <button class="small" data-k="compra" data-filtro="1">Ver</button></div>`;
   ab.hidden=!h;ab.innerHTML=h;
 }
 function renderList(){
@@ -199,7 +201,7 @@ function renderList(){
     const e=ETAPAS[IDX[r.etapa]]||ETAPAS[0];const p=prazoInfo(r);
     const pcls=r.etapa==="ativa"?"ok":r.etapa==="recusada"?"":"a";
     return `<button class="card" data-id="${esc(r.id)}"><div class="row"><div style="min-width:0"><h3>${esc(r.nome||"Sem nome")}</h3><div class="ig">${esc(r.instagram||"")}${r.seguidores?" · "+Number(r.seguidores).toLocaleString("pt-BR")+" seguidores":""}</div></div><span class="pill ${pcls}">${esc(e.l)}</span></div>
-    ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}${r.etapa==="aprovada"?`<span class="pill ${r.dadosWbuy?"ok":"warn"}" style="align-self:flex-start">${r.dadosWbuy?"Dados recebidos: cadastrar na wBuy":"Aguardando dados da afiliada"}</span>`:""}
+    ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}${r.etapa==="compra"&&r.voucher?.usado?`<span class="pill warn" style="align-self:flex-start">Voucher usado${r.voucher.pedidoUso?" · pedido "+esc(r.voucher.pedidoUso):""}</span>`:""}${r.etapa==="ativa"?`<span class="pill ok" style="align-self:flex-start">${resumoVendas(r).txt}</span>`:""}${r.etapa==="aprovada"?`<span class="pill ${r.dadosWbuy?"ok":"warn"}" style="align-self:flex-start">${r.dadosWbuy?"Dados recebidos: cadastrar na wBuy":"Aguardando dados da afiliada"}</span>`:""}
     <div class="codes"><span class="code">${esc(r.protocolo||"")}</span>${r.voucher?.codigo?`<span class="code">${esc(r.voucher.codigo)}</span>`:""}${(r.cupom?.codigo||r.dadosWbuy?.cupom)?`<span class="code">${esc(r.cupom?.codigo||r.dadosWbuy.cupom)}</span>`:""}</div>
     ${e.next?`<div class="next">Próximo passo: ${esc(e.next)}</div>`:""}</button>`}).join(""):`<div class="empty" style="grid-column:1/-1"><p>Nenhuma afiliada encontrada com esse filtro.</p></div>`;
 }
@@ -220,6 +222,12 @@ function msgs(r){
     ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe ${r.cupom?.comissao??cfg.comissao}% de comissão + ${r.cupom?.creditoLook??cfg.creditoLook}% em crédito look por mês sobre as vendas com ele.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
     recusada:`Oi, ${n}! Obrigada pelo interesse no programa de afiliadas Flora Amar 🌸 Desta vez seu perfil não se encaixou no que buscamos, mas seguimos juntas por lá!`
   };
+}
+function resumoVendas(r){
+  const ym=hoje().slice(0,7);const vs=Object.entries(r.vendas||{}).map(([id,v])=>({id,...v})).filter(v=>!/cancel|devolv|estorn|recus/i.test(v.status||""));
+  const mes=vs.filter(v=>(v.em||"").slice(0,7)===ym);const tot=mes.reduce((a,v)=>a+(Number(v.total)||0),0);
+  const pct=Math.min(100,Math.round(tot/(cfg.metaMensal||1)*100));
+  return {mes,tot,pct,todas:vs,txt:`${mes.length} venda${mes.length!==1?"s":""} no mês · ${brl(tot)}`};
 }
 const linkCad=r=>r.protocolo&&r.tokenCadastro?`${location.origin}/cadastro?p=${r.protocolo}&t=${r.tokenCadastro}`:"(salve a ficha para gerar o link)";
 const fmtCpf=c=>String(c||"").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
@@ -250,6 +258,7 @@ function renderDrawer(){
     <div class="kv"><span>Valor</span><span class="v">${brl(r.voucher?.valor)}</span></div>
     <div class="kv"><span>Válido até</span><span class="v">${fmtD(r.voucher?.validade)}</span></div>
     <ol class="how"><li>wBuy → Marketing → Cupons de desconto → Novo cupom</li><li>Código <b>${esc(r.voucher?.codigo)}</b>, desconto em <b>valor fixo de ${brl(r.voucher?.valor)}</b></li><li>Limite de <b>1 uso</b>, validade até ${fmtD(r.voucher?.validade)}</li>${r.dadosWbuy?`<li>Se a wBuy permitir, restrinja ao cliente <b>${esc(r.dadosWbuy.emailLoja||r.dadosWbuy.email)}</b></li>`:""}</ol>
+    ${r.voucher?.usado?`<div class="kv"><span>Uso na loja</span><span class="pill warn">Usado ${r.voucher.usadoEm?new Date(r.voucher.usadoEm).toLocaleDateString("pt-BR"):""}${r.voucher.pedidoUso?" · pedido "+esc(r.voucher.pedidoUso):""}</span></div>`:""}
     ${chk("voucher.cadastradoWbuy","Voucher cadastrado na wBuy")}${campo("pedido","Nº do pedido da afiliada na wBuy")}</div>`;
     h+=blocoDados(r);
     if(r.etapa==="aprovada"){h+=blocoEmail("E-mail de aprovação","Você foi aprovada no Programa de Afiliadas Flora Amar 🌸",M.aprovadaEmail,r.email);h+=blocoMsg("Mensagem de aprovação (WhatsApp)",M.aprovada,W);}
@@ -269,6 +278,14 @@ function renderDrawer(){
     <ol class="how"><li>wBuy → Afiliados → Novo afiliado: use os dados acima, Código <b>${esc(r.cupom?.codigo)}</b>, e marque “Personalizar comissão” com <b>${r.cupom?.comissao}%</b> se o grupo não tiver esse valor</li><li>Criar o cupom <b>${esc(r.cupom?.codigo)}</b> com <b>${r.cupom?.desconto}%</b> de desconto, sem limite de uso</li><li>Vincular o cupom à afiliada, para a comissão contar nas vendas</li></ol>
     <p class="note">Os nomes dos menus podem variar conforme a versão da sua wBuy.</p>
     ${chk("cupom.afiliadaCadastrada","Afiliada cadastrada no módulo de afiliados da wBuy")}${chk("cupom.cadastradoWbuy","Cupom criado e vinculado à afiliada")}${chk("cupom.grupo","Adicionada ao grupo de afiliadas no WhatsApp")}</div>`;
+    if(r.etapa==="ativa"){const v=resumoVendas(r);const cl=r.cupom?.creditoLook??cfg.creditoLook,cm=r.cupom?.comissao??cfg.comissao;
+      h+=`<div class="box focus"><div class="kv"><h4>Vendas com o cupom · ${new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</h4><span class="pill ${v.tot>=cfg.metaMensal?"ok":"warn"}">${v.tot>=cfg.metaMensal?"Meta batida":"Meta: "+v.pct+"%"}</span></div>
+      <div class="steps"><span class="done" style="flex:${v.pct||0.01}"></span><span style="flex:${100-v.pct||0.01}"></span></div>
+      <div class="kv"><span>Vendas no mês</span><span class="v">${v.mes.length} · ${brl(v.tot)}</span></div>
+      <div class="kv"><span>Comissão (${cm}%)</span><span class="v">${brl(v.tot*cm/100)}</span></div>
+      <div class="kv"><span>Crédito look a liberar (${cl}%)</span><span class="v">${brl(v.tot*cl/100)}</span></div>
+      <div class="kv"><span>Total desde a ativação</span><span class="v">${v.todas.length} venda${v.todas.length!==1?"s":""} · ${brl(v.todas.reduce((a,x)=>a+(Number(x.total)||0),0))}</span></div>
+      ${v.mes.length?`<div class="hist">${v.mes.slice(-8).reverse().map(x=>`<span>Pedido ${esc(x.id)} · ${x.total!=null?brl(x.total):"valor não informado"}${x.status?" · "+esc(x.status):""}</span>`).join("")}</div>`:`<p class="note" style="margin:0">As vendas aparecem aqui sozinhas quando a wBuy avisar um pedido com o cupom ${esc(r.cupom?.codigo)}.</p>`}</div>`;}
     if(r.etapa==="ativa"||r.etapa==="video"){h+=blocoEmail("E-mail do cupom ativo","Seu cupom de afiliada Flora Amar está ativo ✨",M.ativa,r.dadosWbuy?.email||r.email);h+=blocoMsg("Mensagem do cupom ativo (WhatsApp)",M.ativa,W);}
   }
   if(r.etapa==="recusada")h+=blocoMsg("Mensagem de resposta",M.recusada,W);
@@ -323,7 +340,13 @@ function abrirConfig(){
   <label class="f">WhatsApp do marketing (aparece na página)<input id="cfg-whatsapp" value="${esc(cfg.whatsapp)}"></label></div>
   <label class="check"><input type="checkbox" id="cfg-inscricoesAbertas" ${cfg.inscricoesAbertas?"checked":""}><span>Inscrições abertas na página pública</span></label>
   <p class="note">Os valores aparecem na página pública e nas políticas. Afiliadas já aprovadas mantêm o que foi combinado.</p>
-  <div class="btnrow"><button class="primary" id="cfgSalvar">Salvar regras</button></div></div></aside>`;
+  <div class="btnrow"><button class="primary" id="cfgSalvar">Salvar regras</button></div></div>
+  <div class="box"><div class="kv"><h4>Avisos automáticos da wBuy</h4><span class="pill ${cfg.webhookTotal?"ok":"warn"}">${cfg.webhookTotal?"Recebendo":"Não ligado"}</span></div>
+  <p class="note" style="margin:0">Com isso o painel avisa sozinho quando a afiliada usa o voucher, move o pedido para “a caminho” e “entregue” (iniciando o prazo do vídeo) e soma as vendas do cupom de cada afiliada.</p>
+  <ol class="how"><li>wBuy → <b>Geral → Plataforma → API e webhooks</b> → <b>Novo webhook</b></li><li>Tipo <b>Pedidos</b>, envio <b>POST</b>, cole o endereço abaixo</li><li>Crie outro: tipo <b>Status de pedidos</b>, envio <b>PUT</b>, mesmo endereço</li></ol>
+  <div class="kv"><span class="code" style="overflow-wrap:anywhere;flex:1;min-width:0">${esc(cfg.webhookUrl||"")}</span><button class="small" data-cp="${esc(cfg.webhookUrl||"")}">Copiar</button></div>
+  ${cfg.webhookUltimo?`<p class="note" style="margin:0">Último aviso: ${new Date(cfg.webhookUltimo.em).toLocaleString("pt-BR")}${cfg.webhookUltimo.pedido?" · pedido "+esc(cfg.webhookUltimo.pedido):""}${cfg.webhookUltimo.achados?.length?" · "+esc(cfg.webhookUltimo.achados.join(", ")):""}</p>`:`<p class="note" style="margin:0">Nenhum aviso recebido ainda.</p>`}
+  <p class="note" style="margin:0">Guarde este endereço só para a wBuy: quem tiver ele consegue enviar avisos falsos.</p></div></aside>`;
 }
 async function salvarConfig(){
   const n={};Object.keys(DEF).forEach(k=>{const el=$("#cfg-"+k);n[k]=el.type==="checkbox"?el.checked:el.type==="number"?Number(el.value):el.value});

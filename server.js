@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trocar-esta-senha";
 const SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update("flora:" + ADMIN_PASSWORD).digest("hex");
 const LINK_SECRET = process.env.LINK_SECRET || crypto.createHash("sha256").update("link:" + (process.env.DATABASE_URL || ADMIN_PASSWORD)).digest("hex");
+const WEBHOOK_KEY = crypto.createHmac("sha256", LINK_SECRET).update("webhook-wbuy").digest("hex").slice(0, 24);
 const tokenCadastro = prot => crypto.createHmac("sha256", LINK_SECRET).update("cad:" + prot).digest("base64url").slice(0, 22);
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 const TIPOS_PIX = ["CPF", "CNPJ", "E-mail", "Telefone", "Chave aleatória"];
@@ -90,6 +91,7 @@ const limite = (max, janelaMs) => (req, res, next) => {
 /* ---------------- app ---------------- */
 const app = express();
 app.set("trust proxy", true);
+app.use("/webhook", express.text({ type: "*/*", limit: "1mb" }));
 app.use(express.json({ limit: "300kb" }));
 app.use((req, res, next) => { res.setHeader("X-Content-Type-Options", "nosniff"); res.setHeader("Referrer-Policy", "same-origin"); next(); });
 
@@ -201,6 +203,79 @@ app.post("/api/cadastro", limite(15, 15 * 60e3), async (req, res) => {
   res.json({ ok: true, cupom: d.cupom });
 });
 
+/* ---- webhook da wBuy: detecta uso do voucher e vendas com o cupom da afiliada ---- */
+function parseCorpo(raw) {
+  if (raw && typeof raw === "object") return raw;
+  const t = String(raw || "").trim();
+  try { return JSON.parse(t); } catch {}
+  try { const o = {}; new URLSearchParams(t).forEach((v, k) => { try { o[k] = JSON.parse(v); } catch { o[k] = v; } }); return o; } catch { return { raw: t }; }
+}
+function varrer(obj, fn, chave = "", prof = 0) {
+  if (prof > 8 || obj == null) return;
+  if (Array.isArray(obj)) return obj.forEach(v => varrer(v, fn, chave, prof + 1));
+  if (typeof obj === "object") return Object.entries(obj).forEach(([k, v]) => varrer(v, fn, k, prof + 1));
+  fn(chave, obj);
+}
+function dadosPedido(corpo) {
+  let id = null, total = null, status = null; const textos = [];
+  varrer(corpo, (k, v) => {
+    const kl = k.toLowerCase();
+    if (typeof v === "string") textos.push(v.toUpperCase().trim());
+    if (id == null && /^(id|id_pedido|pedido|pedido_id|numero|numero_pedido|order_id|codigo_pedido)$/.test(kl) && (typeof v === "number" || /^\w{1,30}$/.test(String(v)))) id = String(v);
+    if (total == null && /^(total|valor_total|total_pedido|valortotal|order_total|valor)$/.test(kl)) { const n = Number(String(v).replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); if (!isNaN(n) && n > 0) total = n; }
+    if (status == null && /^(status|situacao|status_nome|status_pedido|order_status)$/.test(kl) && typeof v !== "object") status = String(v);
+  });
+  return { id, total, status, textos };
+}
+app.all("/webhook/wbuy/:key", async (req, res) => {
+  if (req.params.key !== WEBHOOK_KEY) return res.status(404).send("not found");
+  res.json({ ok: true });
+  try {
+    const corpo = parseCorpo(req.body);
+    const p = dadosPedido(corpo);
+    const codigos = new Set(p.textos);
+    const todas = await store.list();
+    const achados = [];
+    for (const r of todas) {
+      let mudou = false;
+      const vc = r.voucher?.codigo?.toUpperCase();
+      if (vc && codigos.has(vc) && !r.voucher.usado) {
+        r.voucher.usado = true; r.voucher.usadoEm = new Date().toISOString(); r.voucher.pedidoUso = p.id;
+        if (!r.pedido && p.id) r.pedido = p.id;
+        r.historico = [...(r.historico || []), { em: hoje(), t: `Voucher ${vc} usado na loja${p.id ? " · pedido " + p.id : ""} (aviso automático da wBuy)` }];
+        if (r.etapa === "aprovada") { r.etapa = "compra"; r.voucher.cadastradoWbuy = true; }
+        mudou = true; achados.push(`voucher ${vc}`);
+      }
+      // status do pedido do voucher: avança envio/entrega sozinho
+      const pedVoucher = r.voucher?.pedidoUso || r.pedido;
+      if (p.id && pedVoucher && String(pedVoucher) === p.id && p.status) {
+        const st = p.status.toLowerCase();
+        if (/entregue|conclu|finaliz/.test(st) && ["compra", "enviado"].includes(r.etapa)) {
+          r.entregueEm = hoje(); r.enviadoEm = r.enviadoEm || hoje(); r.etapa = "entregue";
+          const d = new Date(r.entregueEm + "T12:00:00"); d.setDate(d.getDate() + Number(r.prazoDias || 15)); r.prazoVideo = d.toISOString().slice(0, 10);
+          r.historico = [...(r.historico || []), { em: hoje(), t: `Pedido ${p.id} entregue (aviso automático da wBuy) · vídeo até ${r.prazoVideo.split("-").reverse().join("/")}` }];
+          mudou = true; achados.push("entrega");
+        } else if (/envi|despach|transport|saiu/.test(st) && r.etapa === "compra") {
+          r.enviadoEm = hoje(); r.etapa = "enviado";
+          r.historico = [...(r.historico || []), { em: hoje(), t: `Pedido ${p.id} enviado (aviso automático da wBuy)` }];
+          mudou = true; achados.push("envio");
+        }
+      }
+      const cc = (r.cupom?.codigo || r.dadosWbuy?.cupom || "").toUpperCase();
+      if (cc && codigos.has(cc) && p.id && !(vc && cc === vc)) {
+        r.vendas = r.vendas || {};
+        const ant = r.vendas[p.id] || {};
+        r.vendas[p.id] = { total: p.total ?? ant.total ?? null, status: p.status ?? ant.status ?? "", em: ant.em || new Date().toISOString(), atualizadoEm: new Date().toISOString() };
+        mudou = true; achados.push(`cupom ${cc}`);
+      }
+      if (mudou) await store.put(r.id, r);
+    }
+    const log = (await store.getConfig()).__webhookLog || [];
+    log.unshift({ em: new Date().toISOString(), metodo: req.method, pedido: p.id, total: p.total, status: p.status, achados, amostra: JSON.stringify(corpo).slice(0, 3000) });
+    const c = await store.getConfig(); c.__webhookLog = log.slice(0, 20); await store.setConfig(c);
+  } catch (e) { console.error("webhook", e); }
+});
+
 /* ---- painel ---- */
 app.post("/api/login", limite(10, 15 * 60e3), (req, res) => {
   const s = String(req.body?.senha || "");
@@ -226,12 +301,14 @@ app.put("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => {
   await store.put(id, data); res.json({ ok: true, id, protocolo: data.protocolo });
 });
 app.delete("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => { await store.del(String(req.params.id)); res.json({ ok: true }); });
-app.get("/api/admin/config", exigeAdmin, async (req, res) => res.json({ ...(await store.getConfig()), emailAutomatico: !!mailer }));
+app.get("/api/admin/config", exigeAdmin, async (req, res) => { const c = await store.getConfig(); const log = c.__webhookLog || []; delete c.__webhookLog; res.json({ ...c, emailAutomatico: !!mailer, webhookUrl: `${req.protocol}://${req.get("host")}/webhook/wbuy/${WEBHOOK_KEY}`, webhookUltimo: log[0] || null, webhookTotal: log.length }); });
+app.get("/api/admin/webhook-log", exigeAdmin, async (req, res) => res.json((await store.getConfig()).__webhookLog || []));
 app.put("/api/admin/config", exigeAdmin, async (req, res) => {
   const b = req.body || {}; const c = { ...DEFAULT_CONFIG };
   delete b.emailAutomatico;
   for (const k of Object.keys(DEFAULT_CONFIG)) if (k in b) c[k] = typeof DEFAULT_CONFIG[k] === "number" ? (Number(b[k]) >= 0 ? Number(b[k]) : DEFAULT_CONFIG[k]) : typeof DEFAULT_CONFIG[k] === "boolean" ? !!b[k] : limpa(b[k], 40);
-  await store.setConfig(c); res.json(c);
+  const atual = await store.getConfig(); if (atual.__webhookLog) c.__webhookLog = atual.__webhookLog;
+  await store.setConfig(c); const { __webhookLog, ...pub } = c; res.json(pub);
 });
 
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: "Algo deu errado. Tente de novo em instantes." }); });
