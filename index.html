@@ -88,6 +88,9 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible,
 .msg{border-radius:10px;padding:12px 14px;font-weight:600}
 .msg.err{background:var(--bad-soft);color:var(--bad)}
 .msg.ok{background:var(--ok-soft);color:var(--ok)}
+input.err,textarea.err{border-color:var(--bad);background:var(--bad-soft)}
+.aceite.err span{color:var(--bad);font-weight:600}
+.sucesso h2{color:var(--accent-deep)}
 .sucesso{text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;padding:20px 0}
 .prot{font-family:ui-monospace,Menlo,monospace;font-size:26px;letter-spacing:.08em;background:var(--accent-soft);color:var(--accent-deep);padding:8px 18px;border-radius:10px}
 .status{display:flex;flex-direction:column;gap:12px}
@@ -193,6 +196,7 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
     <a class="contato" id="waLink" href="https://wa.me/5511920403050" target="_blank" rel="noopener">WhatsApp <span data-v="whatsMkt">(11) 92040-3050</span></a></div>
   <form id="form" novalidate>
     <div id="formBody" style="display:flex;flex-direction:column;gap:14px">
+    <div id="formMsg" hidden role="alert"></div>
     <label>Nome completo<input id="nome" name="nome" required autocomplete="name"></label>
     <div class="g2"><label>Instagram<input id="instagram" name="instagram" required placeholder="@seuperfil"></label><label>TikTok <small>opcional</small><input id="tiktok" name="tiktok" placeholder="@seuperfil"></label></div>
     <div class="g2"><label>Seguidores <small>no maior perfil</small><input id="seguidores" name="seguidores" required inputmode="numeric" placeholder="ex.: 4500"></label><label>Cidade / UF<input id="cidade" name="cidade" required placeholder="São Paulo / SP"></label></div>
@@ -201,7 +205,6 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
     <label>Sua proposta de conteúdo<small>Como seria o seu vídeo de recebidos e os seus 2 vídeos por mês?</small><textarea id="proposta" name="proposta" required></textarea></label>
     <input class="hp" name="site" id="site" tabindex="-1" autocomplete="off" aria-hidden="true">
     <label class="aceite"><input type="checkbox" id="aceite" name="aceite"><span>Li e aceito o <a href="#regulamento">regulamento e as diretrizes</a> do Programa de Afiliadas Flora Amar.</span></label>
-    <div id="formMsg" hidden></div>
     <button class="cta" type="submit" id="enviar">Enviar inscrição</button>
     </div>
   </form>
@@ -233,20 +236,24 @@ fetch("/api/config-publica").then(r=>r.json()).then(c=>{
 async function post(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});const j=await r.json().catch(()=>({erro:"Erro de conexão. Tente de novo."}));if(!r.ok)throw new Error(j.erro||"Erro");return j}
 $("#form").addEventListener("submit",async e=>{
   e.preventDefault();const f=e.target;const m=$("#formMsg");const b=$("#enviar");
+  f.querySelectorAll(".err").forEach(x=>x.classList.remove("err"));
+  const erro=(t,els)=>{m.hidden=false;m.className="msg err";m.textContent=t;(els||[]).forEach(x=>x&&x.classList.add("err"));m.scrollIntoView({behavior:"smooth",block:"center"})};
   const d=Object.fromEntries(new FormData(f));d.aceite=$("#aceite").checked;
-  const falt=["nome","instagram","seguidores","cidade","whatsapp","email","proposta"].filter(k=>!String(d[k]||"").trim());
-  if(falt.length){m.hidden=false;m.className="msg err";m.textContent="Preencha todos os campos obrigatórios.";$("#"+falt[0]).focus();return}
-  if(!d.aceite){m.hidden=false;m.className="msg err";m.textContent="Para continuar, aceite o regulamento do programa.";return}
+  const nomes={nome:"Nome",instagram:"Instagram",seguidores:"Seguidores",cidade:"Cidade",whatsapp:"WhatsApp",email:"E-mail",proposta:"Proposta de conteúdo"};
+  const falt=Object.keys(nomes).filter(k=>!String(d[k]||"").trim());
+  if(falt.length){erro("Falta preencher: "+falt.map(k=>nomes[k]).join(", ")+".",falt.map(k=>$("#"+k)));return}
+  if(!d.aceite){erro("Para continuar, marque que você aceita o regulamento do programa.",[$("#aceite").closest("label")]);return}
   b.disabled=true;b.textContent="Enviando…";
   try{const j=await post("/api/inscricao",d);
-    $("#formBody").innerHTML=`<div class="sucesso"><h2>Inscrição enviada!</h2><p>Seu protocolo é</p><div class="prot">${esc(j.protocolo)}</div><p class="lead" style="margin:0">Guarde este número. Use-o com o seu e-mail em “Minha inscrição” para ver a resposta.</p></div>`;
+    $("#formBody").innerHTML=`<div class="sucesso"><h2>Inscrição enviada!</h2><p>Seu protocolo é</p><div class="prot">${esc(j.protocolo)}</div><p class="lead" style="margin:0">Guarde este número. Use-o com o seu e-mail em “Minha inscrição” para ver a resposta. Você também recebe a resposta pelo WhatsApp.</p></div>`;
     $("#sProt").value=j.protocolo;$("#sEmail").value=d.email;
-  }catch(err){m.hidden=false;m.className="msg err";m.textContent=err.message;b.disabled=false;b.textContent="Enviar inscrição"}
+    $("#inscricao").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(err){b.disabled=false;b.textContent="Enviar inscrição";erro(err.message,/seguidores/i.test(err.message)?[$("#seguidores")]:/Instagram ou e-mail/i.test(err.message)?[$("#instagram"),$("#email")]:/WhatsApp/i.test(err.message)?[$("#whatsapp")]:/e-mail/i.test(err.message)?[$("#email")]:[])}
 });
 async function copiar(t){try{await navigator.clipboard.writeText(t)}catch(e){}}
 function renderStatus(s){
   let h=`<div class="status"><div><small style="color:var(--muted)">Olá, ${esc((s.nome||"").split(" ")[0])} · ${esc(s.protocolo)}</small><div class="tit">${esc(s.titulo)}</div><p style="margin:4px 0 0;color:var(--muted)">${esc(s.texto)}</p></div>`;
-  if(s.voucher)h+=`<div class="codebox"><div><small>Voucher de ${brl(s.voucher.valor)} · válido até ${fmtD(s.voucher.validade)}</small><br><code>${esc(s.voucher.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.voucher.codigo)}">Copiar</button></div><a class="cta alt" href="https://www.floraamar.com.br/" target="_blank" rel="noopener">Escolher meus looks</a>+(s.linkCadastro?`<a class="cta" href="${esc(s.linkCadastro)}">${s.cadastroPendente?"Completar meu cadastro e escolher meu cupom":"Ver ou corrigir meu cadastro"}</a>`:"");
+  if(s.voucher)h+=`<div class="codebox"><div><small>Voucher de ${brl(s.voucher.valor)} · válido até ${fmtD(s.voucher.validade)}</small><br><code>${esc(s.voucher.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.voucher.codigo)}">Copiar</button></div><a class="cta alt" href="https://www.floraamar.com.br/" target="_blank" rel="noopener">Escolher meus looks</a>`+(s.linkCadastro?`<a class="cta" href="${esc(s.linkCadastro)}">${s.cadastroPendente?"Completar meu cadastro e escolher meu cupom":"Ver ou corrigir meu cadastro"}</a>`:"");
   if(s.envio)h+=`<p>Envio: <b>${esc(s.envio.metodo||"")}</b>${s.envio.rastreio?` · rastreio <b>${esc(s.envio.rastreio)}</b>`:""}</p>`;
   if(s.prazoVideo)h+=`<p>Prazo para postar o vídeo de recebidos: <b>${fmtD(s.prazoVideo)}</b>. Lembre de marcar o @floraamaroficial e não divulgar cupom neste vídeo.</p><label>Link do vídeo publicado<input id="vLink" type="url" placeholder="https://www.instagram.com/reel/…" value="${esc(s.videoLink||"")}"></label><button type="button" class="cta" id="vEnviar">${s.videoLink?"Atualizar link":"Enviar link do vídeo"}</button>${s.videoLink?`<div class="msg ok">Link recebido. Vamos conferir e liberar seu cupom.</div>`:""}`;
   if(s.cupom)h+=`<div class="codebox"><div><small>Seu cupom · ${s.cupom.desconto}% OFF para suas seguidoras · ${s.cupom.comissao}% de comissão + ${s.cupom.creditoLook ?? 10}% em crédito look</small><br><code>${esc(s.cupom.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.cupom.codigo)}">Copiar</button></div><p style="margin:0">Lembre: 2 vídeos por mês, enviados para o WhatsApp do marketing.</p>`;
