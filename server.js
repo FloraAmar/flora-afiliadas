@@ -8,6 +8,19 @@ const fs = require("fs");
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "trocar-esta-senha";
 const SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update("flora:" + ADMIN_PASSWORD).digest("hex");
+const LINK_SECRET = process.env.LINK_SECRET || crypto.createHash("sha256").update("link:" + (process.env.DATABASE_URL || ADMIN_PASSWORD)).digest("hex");
+const tokenCadastro = prot => crypto.createHmac("sha256", LINK_SECRET).update("cad:" + prot).digest("base64url").slice(0, 22);
+const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+const TIPOS_PIX = ["CPF", "CNPJ", "E-mail", "Telefone", "Chave aleatória"];
+const cpfValido = c => { c = String(c).replace(/\D/g, ""); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false; for (const n of [9, 10]) { let s = 0; for (let i = 0; i < n; i++) s += +c[i] * (n + 1 - i); if (((s * 10) % 11) % 10 !== +c[n]) return false; } return true; };
+
+/* ---------------- e-mail (opcional, via SMTP) ---------------- */
+let mailer = null;
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const nodemailer = require("nodemailer");
+  mailer = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 465), secure: Number(process.env.SMTP_PORT || 465) === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+}
+const EMAIL_FROM = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `Flora Amar <${process.env.SMTP_USER}>` : "");
 const DEFAULT_CONFIG = { voucherValor: 500, desconto: 5, comissao: 5, prazoDias: 15, validadeVoucherDias: 30, minSeguidores: 1000, creditoLook: 10, metaMensal: 500, whatsapp: "(11) 92040-3050", inscricoesAbertas: true };
 
 /* ---------------- armazenamento ---------------- */
@@ -82,6 +95,7 @@ app.use((req, res, next) => { res.setHeader("X-Content-Type-Options", "nosniff")
 
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/painel", (req, res) => res.sendFile(path.join(__dirname, "painel.html")));
+app.get("/cadastro", (req, res) => res.sendFile(path.join(__dirname, "cadastro.html")));
 app.get("/healthz", (req, res) => res.send("ok"));
 
 app.get("/api/config-publica", async (req, res) => {
@@ -119,6 +133,7 @@ function viewPublica(r, c) {
   const e = ETAPA_PUBLICA[r.etapa] || ETAPA_PUBLICA.proposta;
   const v = { nome: r.nome, protocolo: r.protocolo, etapa: r.etapa, titulo: e.t, texto: e.d, whatsapp: c.whatsapp };
   if (["aprovada", "compra"].includes(r.etapa) && r.voucher) v.voucher = { codigo: r.voucher.codigo, valor: r.voucher.valor, validade: r.voucher.validade };
+  if (r.etapa === "aprovada") { v.cadastroPendente = !r.dadosWbuy; v.linkCadastro = `/cadastro?p=${r.protocolo}&t=${tokenCadastro(r.protocolo)}`; }
   if (["enviado"].includes(r.etapa)) v.envio = { metodo: r.envioMetodo, rastreio: r.rastreio };
   if (r.etapa === "entregue") { v.prazoVideo = r.prazoVideo; v.videoLink = r.videoLink || ""; }
   if (r.etapa === "ativa" && r.cupom) v.cupom = { codigo: r.cupom.codigo, desconto: r.cupom.desconto, comissao: r.cupom.comissao, creditoLook: r.cupom.creditoLook ?? c.creditoLook };
@@ -146,6 +161,46 @@ app.post("/api/video", limite(15, 15 * 60e3), async (req, res) => {
   res.json({ ok: true, ...viewPublica(r, await store.getConfig()) });
 });
 
+/* ---- cadastro pós-aprovação (dados para wBuy e nome do cupom) ---- */
+async function acharPorToken(b) {
+  const prot = limpa(b.p, 20).toUpperCase(); const t = limpa(b.t, 40);
+  if (!prot || !t || t.length !== 22 || !crypto.timingSafeEqual(Buffer.from(t), Buffer.from(tokenCadastro(prot)))) return null;
+  return (await store.list()).find(r => r.protocolo === prot) || null;
+}
+app.post("/api/cadastro/info", limite(40, 15 * 60e3), async (req, res) => {
+  const r = await acharPorToken(req.body || {});
+  if (!r) return res.status(404).json({ erro: "Link inválido. Use o link do e-mail de aprovação ou fale com a equipe." });
+  if (!["aprovada", "compra", "enviado", "entregue", "video", "ativa"].includes(r.etapa)) return res.status(400).json({ erro: "Este cadastro ainda não está liberado." });
+  const c = await store.getConfig();
+  res.json({ nome: r.nome, email: r.email, whatsapp: r.whatsapp, cidade: r.cidade, enviado: !!r.dadosWbuy, dados: r.dadosWbuy ? { cupom: r.dadosWbuy.cupom } : null, voucher: r.voucher ? { codigo: r.voucher.codigo, valor: r.voucher.valor, validade: r.voucher.validade } : null, desconto: c.desconto, comissao: c.comissao, creditoLook: c.creditoLook, whatsMkt: c.whatsapp, ufs: UFS, tiposPix: TIPOS_PIX });
+});
+app.post("/api/cadastro", limite(15, 15 * 60e3), async (req, res) => {
+  const b = req.body || {};
+  const r = await acharPorToken(b);
+  if (!r) return res.status(404).json({ erro: "Link inválido." });
+  if (!["aprovada", "compra", "enviado", "entregue"].includes(r.etapa)) return res.status(400).json({ erro: "Não é mais possível alterar estes dados pelo site. Fale com a equipe." });
+  const d = {
+    nome: limpa(b.nome, 120), email: limpa(b.email, 160).toLowerCase(), emailLoja: limpa(b.emailLoja, 160).toLowerCase(), cpf: limpa(b.cpf, 20).replace(/\D/g, ""),
+    nascimento: limpa(b.nascimento, 10), telefone: limpa(b.telefone, 30), cidade: limpa(b.cidade, 100), estado: limpa(b.estado, 2).toUpperCase(),
+    tipoPix: limpa(b.tipoPix, 30), chavePix: limpa(b.chavePix, 120), cupom: limpa(b.cupom, 30).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, ""),
+  };
+  const falt = ["nome", "email", "cpf", "nascimento", "telefone", "cidade", "estado", "tipoPix", "chavePix", "cupom"].filter(k => !d[k]);
+  if (falt.length) return res.status(400).json({ erro: "Preencha todos os campos obrigatórios.", campo: falt[0] });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email) || (d.emailLoja && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.emailLoja))) return res.status(400).json({ erro: "Confira o e-mail.", campo: "email" });
+  if (!cpfValido(d.cpf)) return res.status(400).json({ erro: "CPF inválido. Confira os números.", campo: "cpf" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return res.status(400).json({ erro: "Confira a data de nascimento.", campo: "nascimento" });
+  if (!UFS.includes(d.estado)) return res.status(400).json({ erro: "Escolha o estado.", campo: "estado" });
+  if (!TIPOS_PIX.includes(d.tipoPix)) return res.status(400).json({ erro: "Escolha o tipo de chave PIX.", campo: "tipoPix" });
+  if (!/^[A-Z0-9]{4,20}$/.test(d.cupom)) return res.status(400).json({ erro: "O cupom deve ter de 4 a 20 letras ou números, sem espaços nem símbolos.", campo: "cupom" });
+  const usados = (await store.list()).filter(x => x.id !== r.id).flatMap(x => [x.voucher?.codigo, x.cupom?.codigo, x.dadosWbuy?.cupom]).filter(Boolean);
+  if (usados.includes(d.cupom)) return res.status(409).json({ erro: "Esse nome de cupom já está em uso. Escolha outro.", campo: "cupom" });
+  const primeiraVez = !r.dadosWbuy;
+  r.dadosWbuy = d; r.dadosRecebidosEm = new Date().toISOString();
+  r.historico = [...(r.historico || []), { em: hoje(), t: primeiraVez ? `Afiliada enviou os dados de cadastro · cupom desejado ${d.cupom}` : "Afiliada atualizou os dados de cadastro" }];
+  await store.put(r.id, r);
+  res.json({ ok: true, cupom: d.cupom });
+});
+
 /* ---- painel ---- */
 app.post("/api/login", limite(10, 15 * 60e3), (req, res) => {
   const s = String(req.body?.senha || "");
@@ -156,17 +211,25 @@ app.post("/api/login", limite(10, 15 * 60e3), (req, res) => {
   res.json({ ok: true });
 });
 app.post("/api/logout", (req, res) => { res.setHeader("Set-Cookie", "fa_sess=; Path=/; Max-Age=0"); res.json({ ok: true }); });
-app.get("/api/admin/afiliadas", exigeAdmin, async (req, res) => res.json(await store.list()));
+app.get("/api/admin/afiliadas", exigeAdmin, async (req, res) => res.json((await store.list()).map(r => ({ ...r, tokenCadastro: r.protocolo ? tokenCadastro(r.protocolo) : "" }))));
+app.post("/api/admin/email", exigeAdmin, limite(60, 60 * 60e3), async (req, res) => {
+  if (!mailer) return res.status(400).json({ erro: "Envio automático de e-mail não configurado." });
+  const { para, assunto, texto } = req.body || {};
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(para || ""))) return res.status(400).json({ erro: "E-mail da afiliada inválido." });
+  try { await mailer.sendMail({ from: EMAIL_FROM, to: String(para), subject: limpa(assunto, 200), text: String(texto || "").slice(0, 10000) }); res.json({ ok: true }); }
+  catch (e) { console.error("email", e.message); res.status(502).json({ erro: "O servidor de e-mail recusou o envio. Confira os dados de SMTP no Render." }); }
+});
 app.put("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => {
   const id = String(req.params.id).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60);
-  const data = req.body || {}; data.atualizadoEm = new Date().toISOString();
+  const data = req.body || {}; delete data.tokenCadastro; data.atualizadoEm = new Date().toISOString();
   if (!data.protocolo) data.protocolo = novoProtocolo();
   await store.put(id, data); res.json({ ok: true, id, protocolo: data.protocolo });
 });
 app.delete("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => { await store.del(String(req.params.id)); res.json({ ok: true }); });
-app.get("/api/admin/config", exigeAdmin, async (req, res) => res.json(await store.getConfig()));
+app.get("/api/admin/config", exigeAdmin, async (req, res) => res.json({ ...(await store.getConfig()), emailAutomatico: !!mailer }));
 app.put("/api/admin/config", exigeAdmin, async (req, res) => {
   const b = req.body || {}; const c = { ...DEFAULT_CONFIG };
+  delete b.emailAutomatico;
   for (const k of Object.keys(DEFAULT_CONFIG)) if (k in b) c[k] = typeof DEFAULT_CONFIG[k] === "number" ? (Number(b[k]) >= 0 ? Number(b[k]) : DEFAULT_CONFIG[k]) : typeof DEFAULT_CONFIG[k] === "boolean" ? !!b[k] : limpa(b[k], 40);
   await store.setConfig(c); res.json(c);
 });

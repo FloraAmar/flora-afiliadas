@@ -189,7 +189,7 @@ function renderTop(){
 function renderList(){
   const q=$("#busca").value.trim().toLowerCase();
   let l=rows.filter(r=>!filtro||r.etapa===filtro);
-  if(q) l=l.filter(r=>[r.nome,r.instagram,r.tiktok,r.protocolo,r.voucher?.codigo,r.cupom?.codigo,r.pedido,r.whatsapp,r.email].join(" ").toLowerCase().includes(q));
+  if(q) l=l.filter(r=>[r.nome,r.instagram,r.tiktok,r.protocolo,r.voucher?.codigo,r.cupom?.codigo,r.dadosWbuy?.cupom,r.pedido,r.whatsapp,r.email].join(" ").toLowerCase().includes(q));
   const o=$("#ordem").value;
   l.sort((a,b)=>o==="nome"?(a.nome||"").localeCompare(b.nome||""):o==="prazo"?((a.prazoVideo||"9999")<(b.prazoVideo||"9999")?-1:1):(b.criadoEm||"").localeCompare(a.criadoEm||""));
   const st=$("#status");
@@ -199,8 +199,8 @@ function renderList(){
     const e=ETAPAS[IDX[r.etapa]]||ETAPAS[0];const p=prazoInfo(r);
     const pcls=r.etapa==="ativa"?"ok":r.etapa==="recusada"?"":"a";
     return `<button class="card" data-id="${esc(r.id)}"><div class="row"><div style="min-width:0"><h3>${esc(r.nome||"Sem nome")}</h3><div class="ig">${esc(r.instagram||"")}${r.seguidores?" · "+Number(r.seguidores).toLocaleString("pt-BR")+" seguidores":""}</div></div><span class="pill ${pcls}">${esc(e.l)}</span></div>
-    ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}
-    <div class="codes"><span class="code">${esc(r.protocolo||"")}</span>${r.voucher?.codigo?`<span class="code">${esc(r.voucher.codigo)}</span>`:""}${r.cupom?.codigo?`<span class="code">${esc(r.cupom.codigo)}</span>`:""}</div>
+    ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}${r.etapa==="aprovada"?`<span class="pill ${r.dadosWbuy?"ok":"warn"}" style="align-self:flex-start">${r.dadosWbuy?"Dados recebidos: cadastrar na wBuy":"Aguardando dados da afiliada"}</span>`:""}
+    <div class="codes"><span class="code">${esc(r.protocolo||"")}</span>${r.voucher?.codigo?`<span class="code">${esc(r.voucher.codigo)}</span>`:""}${(r.cupom?.codigo||r.dadosWbuy?.cupom)?`<span class="code">${esc(r.cupom?.codigo||r.dadosWbuy.cupom)}</span>`:""}</div>
     ${e.next?`<div class="next">Próximo passo: ${esc(e.next)}</div>`:""}</button>`}).join(""):`<div class="empty" style="grid-column:1/-1"><p>Nenhuma afiliada encontrada com esse filtro.</p></div>`;
 }
 
@@ -213,12 +213,26 @@ function chk(k,label){return `<label class="check"><input type="checkbox" data-c
 function msgs(r){
   const n=primeiroNome(r.nome)||"tudo bem";const site=location.origin;
   return {
-    aprovada:`Oi, ${n}! 🌸 Sua inscrição para ser afiliada Flora Amar foi APROVADA!\n\nVocê ganhou um voucher de ${brl(r.voucher?.valor??cfg.voucherValor)} para escolher seus looks em www.floraamar.com.br\n\nSeu código: ${r.voucher?.codigo||""}\nUse no carrinho, válido até ${fmtD(r.voucher?.validade)}.\n\nDepois que os looks chegarem, você tem ${r.prazoDias??cfg.prazoDias} dias para postar o seu conteúdo de recebidos marcando o @floraamaroficial (sem divulgar cupom nesse vídeo). Quando postar, envie o link em ${site}/#acompanhar com o protocolo ${r.protocolo||""}. 💕`,
+    aprovada:`Oi, ${n}! 🌸 Sua inscrição para ser afiliada Flora Amar foi APROVADA!\n\nVocê ganhou um voucher de ${brl(r.voucher?.valor??cfg.voucherValor)} para escolher seus looks em www.floraamar.com.br\n\nSeu código: ${r.voucher?.codigo||""}\nUse no carrinho, válido até ${fmtD(r.voucher?.validade)}.\n\nComplete seu cadastro de afiliada e escolha o nome do seu cupom aqui: ${linkCad(r)}\n\nDepois que os looks chegarem, você tem ${r.prazoDias??cfg.prazoDias} dias para postar o seu conteúdo de recebidos marcando o @floraamaroficial (sem divulgar cupom nesse vídeo). Quando postar, envie o link em ${site}/#acompanhar com o protocolo ${r.protocolo||""}. 💕`,
+    aprovadaEmail:`Oi, ${n}! 🌸\n\nSua inscrição no Programa de Afiliadas Flora Amar foi APROVADA!\n\n1) COMPLETE SEU CADASTRO E ESCOLHA O NOME DO SEU CUPOM\nPreencha seus dados para o cadastro de afiliada e o recebimento da comissão neste link:\n${linkCad(r)}\n\n2) ESCOLHA SEUS LOOKS\nVocê ganhou um voucher de ${brl(r.voucher?.valor??cfg.voucherValor)} para escolher seus looks em www.floraamar.com.br\nSeu código: ${r.voucher?.codigo||""} (válido até ${fmtD(r.voucher?.validade)})\n\n3) CONTEÚDO DE RECEBIDOS\nDepois que os looks chegarem, você tem ${r.prazoDias??cfg.prazoDias} dias para postar o seu conteúdo de recebidos marcando o @floraamaroficial (sem divulgar cupom nesse vídeo). Quando postar, envie o link em ${site}/#acompanhar com o protocolo ${r.protocolo||""}.\n\nAssim que o vídeo for publicado, ativamos o seu cupom exclusivo e você entra no grupo de afiliadas.\n\nQualquer dúvida, fale com a equipe no WhatsApp ${cfg.whatsapp}.\n\nCom carinho,\nEquipe Flora Amar`,
     entregue:`Oi, ${n}! Seus looks Flora Amar chegaram 💐\n\nO conteúdo de recebidos vai até ${fmtD(r.prazoVideo)}. Quando postar, envie o link em ${site}/#acompanhar (protocolo ${r.protocolo||""}) para liberarmos seu cupom de afiliada. 😊`,
     cobranca:`Oi, ${n}! Tudo bem? Passando para lembrar do vídeo com os looks Flora Amar, o prazo era ${fmtD(r.prazoVideo)}. Consegue postar nos próximos dias? Assim já libero seu cupom de afiliada com comissão. 💕`,
     ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe ${r.cupom?.comissao??cfg.comissao}% de comissão + ${r.cupom?.creditoLook??cfg.creditoLook}% em crédito look por mês sobre as vendas com ele.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
     recusada:`Oi, ${n}! Obrigada pelo interesse no programa de afiliadas Flora Amar 🌸 Desta vez seu perfil não se encaixou no que buscamos, mas seguimos juntas por lá!`
   };
+}
+const linkCad=r=>r.protocolo&&r.tokenCadastro?`${location.origin}/cadastro?p=${r.protocolo}&t=${r.tokenCadastro}`:"(salve a ficha para gerar o link)";
+const fmtCpf=c=>String(c||"").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
+function blocoEmail(titulo,assunto,texto,para){return `<div class="box"><div class="kv"><h4>${titulo}</h4><div class="btnrow">${para?`<button class="small primary" data-mail="1" data-para="${esc(para)}" data-assunto="${esc(assunto)}">${cfg.emailAutomatico?"Enviar e-mail":"Abrir no Gmail"}</button>`:""}<button class="small" data-copy>Copiar</button></div></div><p class="note" style="margin:0">Para: ${esc(para||"sem e-mail")} · Assunto: ${esc(assunto)}</p><div class="msg">${esc(texto)}</div></div>`}
+function blocoDados(r){
+  const d=r.dadosWbuy;
+  if(!d)return `<div class="box ${r.etapa==="aprovada"?"focus":""}"><div class="kv"><h4>Cadastro de afiliada</h4><span class="pill warn">Aguardando a afiliada</span></div><p class="note" style="margin:0">Ela preenche CPF, nascimento, PIX e o nome do cupom pelo link do e-mail de aprovação.</p><div class="kv"><span class="code" style="overflow-wrap:anywhere">${esc(linkCad(r))}</span><button class="small" data-cp="${esc(linkCad(r))}">Copiar link</button></div></div>`;
+  const nasc=d.nascimento?d.nascimento.split("-").reverse().join("/"):"";
+  const linhas=[["Nome",d.nome],["Código (cupom)",d.cupom],["E-mail",d.email],["CPF",fmtCpf(d.cpf)],["Data de nascimento",nasc],["Telefone",d.telefone],["Cidade",d.cidade],["Estado",d.estado],["Tipo de chave PIX",d.tipoPix],["Chave PIX",d.chavePix]];
+  if(d.emailLoja)linhas.push(["E-mail da conta na loja",d.emailLoja]);
+  return `<div class="box ${r.etapa==="aprovada"?"focus":""}"><div class="kv"><h4>Dados para cadastrar na wBuy</h4><span class="pill ok">Recebidos ${r.dadosRecebidosEm?new Date(r.dadosRecebidosEm).toLocaleDateString("pt-BR"):""}</span></div>
+  <p class="note" style="margin:0">Na wBuy: Afiliados → Novo afiliado. Os campos estão na mesma ordem do formulário de lá.</p>
+  ${linhas.map(([k,v])=>`<div class="kv"><span>${k}</span><span style="display:flex;gap:8px;align-items:center;min-width:0"><b style="overflow-wrap:anywhere">${esc(v)}</b><button class="small" data-cp="${esc(v)}" aria-label="Copiar ${k}">Copiar</button></span></div>`).join("")}</div>`;
 }
 function blocoMsg(titulo,texto,whats){return `<div class="box"><div class="kv"><h4>${titulo}</h4><div class="btnrow"><button class="small" data-copy>Copiar</button>${whats?`<a class="btn small" style="text-decoration:none;padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener" href="https://wa.me/${waNum(whats)}?text=${encodeURIComponent(texto)}">Enviar no WhatsApp</a>`:""}</div></div><div class="msg">${esc(texto)}</div></div>`}
 function renderDrawer(){
@@ -235,9 +249,10 @@ function renderDrawer(){
     <div class="kv"><span>Código</span><span class="code">${esc(r.voucher?.codigo)}</span></div>
     <div class="kv"><span>Valor</span><span class="v">${brl(r.voucher?.valor)}</span></div>
     <div class="kv"><span>Válido até</span><span class="v">${fmtD(r.voucher?.validade)}</span></div>
-    <ol class="how"><li>wBuy → Marketing → Cupons de desconto → Novo cupom</li><li>Código <b>${esc(r.voucher?.codigo)}</b>, desconto em <b>valor fixo de ${brl(r.voucher?.valor)}</b></li><li>Limite de <b>1 uso</b>, validade até ${fmtD(r.voucher?.validade)}</li></ol>
+    <ol class="how"><li>wBuy → Marketing → Cupons de desconto → Novo cupom</li><li>Código <b>${esc(r.voucher?.codigo)}</b>, desconto em <b>valor fixo de ${brl(r.voucher?.valor)}</b></li><li>Limite de <b>1 uso</b>, validade até ${fmtD(r.voucher?.validade)}</li>${r.dadosWbuy?`<li>Se a wBuy permitir, restrinja ao cliente <b>${esc(r.dadosWbuy.emailLoja||r.dadosWbuy.email)}</b></li>`:""}</ol>
     ${chk("voucher.cadastradoWbuy","Voucher cadastrado na wBuy")}${campo("pedido","Nº do pedido da afiliada na wBuy")}</div>`;
-    if(r.etapa==="aprovada")h+=blocoMsg("Mensagem de aprovação",M.aprovada,W);
+    h+=blocoDados(r);
+    if(r.etapa==="aprovada"){h+=blocoEmail("E-mail de aprovação","Você foi aprovada no Programa de Afiliadas Flora Amar 🌸",M.aprovadaEmail,r.email);h+=blocoMsg("Mensagem de aprovação (WhatsApp)",M.aprovada,W);}
   }
   if(!novo && i>=2 && r.etapa!=="recusada"){
     h+=`<div class="box ${["compra","enviado"].includes(r.etapa)?"focus":""}"><h4>Envio dos looks</h4><div class="grid2"><label class="f">Forma de envio<select data-f="envioMetodo" id="f-envioMetodo">${["Flora Entrega","Correios","Transportadora","Retirada"].map(o=>`<option ${r.envioMetodo===o?"selected":""}>${o}</option>`).join("")}</select></label>${campo("rastreio","Código de rastreio")}${campo("enviadoEm","Enviado em","date")}${i>=3?campo("entregueEm","Entregue em","date"):""}</div>${campo("looks","Looks escolhidos","textarea","peças, tamanhos")}</div>`;
@@ -251,10 +266,10 @@ function renderDrawer(){
     <div class="kv"><span>Cupom</span><span class="code">${esc(r.cupom?.codigo)}</span></div>
     <div class="kv"><span>Desconto para clientes</span><span class="v">${r.cupom?.desconto}%</span></div>
     <div class="kv"><span>Comissão da afiliada</span><span class="v">${r.cupom?.comissao}%</span></div><div class="kv"><span>Crédito look mensal</span><span class="v">${r.cupom?.creditoLook??cfg.creditoLook}%</span></div><div class="kv"><span>Meta mínima</span><span class="v">${brl(cfg.metaMensal)}/mês</span></div>
-    <ol class="how"><li>wBuy → Afiliados → cadastrar <b>${esc(r.nome)}</b> com comissão de <b>${r.cupom?.comissao}%</b></li><li>Criar o cupom <b>${esc(r.cupom?.codigo)}</b> com <b>${r.cupom?.desconto}%</b> de desconto, sem limite de uso</li><li>Vincular o cupom à afiliada, para a comissão contar nas vendas</li></ol>
+    <ol class="how"><li>wBuy → Afiliados → Novo afiliado: use os dados acima, Código <b>${esc(r.cupom?.codigo)}</b>, e marque “Personalizar comissão” com <b>${r.cupom?.comissao}%</b> se o grupo não tiver esse valor</li><li>Criar o cupom <b>${esc(r.cupom?.codigo)}</b> com <b>${r.cupom?.desconto}%</b> de desconto, sem limite de uso</li><li>Vincular o cupom à afiliada, para a comissão contar nas vendas</li></ol>
     <p class="note">Os nomes dos menus podem variar conforme a versão da sua wBuy.</p>
     ${chk("cupom.afiliadaCadastrada","Afiliada cadastrada no módulo de afiliados da wBuy")}${chk("cupom.cadastradoWbuy","Cupom criado e vinculado à afiliada")}${chk("cupom.grupo","Adicionada ao grupo de afiliadas no WhatsApp")}</div>`;
-    if(r.etapa==="ativa"||r.etapa==="video")h+=blocoMsg("Mensagem do cupom ativo",M.ativa,W);
+    if(r.etapa==="ativa"||r.etapa==="video"){h+=blocoEmail("E-mail do cupom ativo","Seu cupom de afiliada Flora Amar está ativo ✨",M.ativa,r.dadosWbuy?.email||r.email);h+=blocoMsg("Mensagem do cupom ativo (WhatsApp)",M.ativa,W);}
   }
   if(r.etapa==="recusada")h+=blocoMsg("Mensagem de resposta",M.recusada,W);
   h+=`<div class="box">${campo("notas","Anotações internas","textarea")}${(r.historico||[]).length?`<div class="hist">${r.historico.slice().reverse().map(x=>`<span>${fmtD(x.em)} · ${esc(x.t)}</span>`).join("")}</div>`:""}</div>`;
@@ -272,6 +287,7 @@ function hist(t){draft.historico=[...(draft.historico||[]),{em:hoje(),t}]}
 async function salvar(msg){
   try{const j=await api("PUT","/api/admin/afiliadas/"+encodeURIComponent(draft.id),draft);draft.protocolo=j.protocolo;
     const k=rows.findIndex(x=>x.id===draft.id);const c=JSON.parse(JSON.stringify(draft));if(k>=0)rows[k]=c;else rows.unshift(c);
+    if(!draft.tokenCadastro){await carregar();const f=rows.find(x=>x.id===draft.id);if(f)draft.tokenCadastro=f.tokenCadastro}
     renderTop();renderList();toast(msg||"Salvo");return true}
   catch(e){if(e.message!=="login")toast("Não foi possível salvar: "+e.message);return false}
 }
@@ -284,13 +300,20 @@ async function acao(a){
   if(a==="compra"){if(!r.voucher?.cadastradoWbuy){toast("Marque antes que o voucher foi cadastrado na wBuy");return}r.etapa="compra";hist("Looks comprados"+(r.pedido?` · pedido ${r.pedido}`:""))}
   if(a==="enviado"){r.enviadoEm=r.enviadoEm||hoje();r.envioMetodo=r.envioMetodo||"Flora Entrega";r.etapa="enviado";hist(`Looks enviados por ${r.envioMetodo}`)}
   if(a==="entregue"){r.entregueEm=r.entregueEm||hoje();r.prazoVideo=addDias(r.entregueEm,Number(r.prazoDias||cfg.prazoDias));r.etapa="entregue";hist(`Looks entregues · vídeo até ${fmtD(r.prazoVideo)}`)}
-  if(a==="video"){if(!r.videoLink){toast("Cole o link do vídeo publicado");return}r.videoEm=r.videoEm||hoje();r.cupom={codigo:codigoUnico(slug(r.nome)+cfg.desconto,r.id),desconto:cfg.desconto,comissao:cfg.comissao,creditoLook:cfg.creditoLook,cadastradoWbuy:false,afiliadaCadastrada:false,grupo:false};r.etapa="video";hist(`Vídeo conferido · cupom ${r.cupom.codigo}`)}
+  if(a==="video"){if(!r.videoLink){toast("Cole o link do vídeo publicado");return}r.videoEm=r.videoEm||hoje();r.cupom={codigo:r.dadosWbuy?.cupom||codigoUnico(slug(r.nome)+cfg.desconto,r.id),desconto:cfg.desconto,comissao:cfg.comissao,creditoLook:cfg.creditoLook,cadastradoWbuy:false,afiliadaCadastrada:false,grupo:false};r.etapa="video";hist(`Vídeo conferido · cupom ${r.cupom.codigo}`)}
   if(a==="ativa"){if(!r.cupom?.cadastradoWbuy||!r.cupom?.afiliadaCadastrada){toast("Marque os dois itens da wBuy antes de ativar");return}r.etapa="ativa";r.ativaEm=hoje();hist("Afiliada ativada")}
   if(a==="voltar"){const ant=ETAPAS[Math.max(0,IDX[r.etapa]-1)].k;r.etapa=ant;hist("Voltou para: "+ETAPAS[IDX[ant]].l)}
   if(a==="excluir"){$("#confirmBox").innerHTML=`<div class="alert">Excluir ${esc(r.nome)} de vez? <button class="small" data-act="excluirSim">Sim, excluir</button><button class="small" data-act="cancel">Cancelar</button></div>`;return}
   if(a==="cancel"){$("#confirmBox").innerHTML="";return}
   if(a==="excluirSim"){try{await api("DELETE","/api/admin/afiliadas/"+encodeURIComponent(r.id));rows=rows.filter(x=>x.id!==r.id);renderTop();renderList();toast("Excluída");fechar()}catch(e){toast("Não foi possível excluir")}return}
   if(await salvar(a==="salvar"?"Alterações salvas":"Etapa atualizada"))renderDrawer();
+}
+async function enviarEmail(t){
+  const texto=t.closest(".box").querySelector(".msg").textContent,para=t.dataset.para,assunto=t.dataset.assunto;
+  if(!cfg.emailAutomatico){window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`,"_blank","noopener");return}
+  t.disabled=true;t.textContent="Enviando…";
+  try{await api("POST","/api/admin/email",{para,assunto,texto});lerCampos();hist(`E-mail enviado: ${assunto}`);await salvar("E-mail enviado para "+para);renderDrawer()}
+  catch(e){if(e.message!=="login")toast(e.message);t.disabled=false;t.textContent="Enviar e-mail"}
 }
 function novaAfiliada(){aberta="__novo";draft={etapa:"proposta"};renderDrawer()}
 function abrirConfig(){
@@ -316,6 +339,8 @@ document.addEventListener("click",async e=>{
   if(t.dataset.act){acao(t.dataset.act);return}
   if(t.hasAttribute("data-copy")){copiar(t.closest(".box").querySelector(".msg").textContent,t);return}
   if(t.dataset.copylink){copiar(location.origin+"/",t);return}
+  if(t.dataset.cp!==undefined){copiar(t.dataset.cp,t);return}
+  if(t.dataset.mail){enviarEmail(t);return}
   if(t.id==="btnNova")novaAfiliada();
   if(t.id==="btnConfig")abrirConfig();
   if(t.id==="cfgSalvar")salvarConfig();
