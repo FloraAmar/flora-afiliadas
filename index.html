@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Seja Afiliada Flora Amar</title>
+<meta name="description" content="Programa de afiliadas Flora Amar: voucher para seus looks, cupom exclusivo, comissão e crédito look em cada venda.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Sacramento&display=swap">
+<style>
+/* Paleta e tipografia do regulamento Flora Amar: bege, verde-sálvia, Montserrat em caixa alta e um toque manuscrito */
+:root{
+  --bg:#efe8de;--surface:#f8f4ee;--sunk:#e6ddd1;--line:#d9cec0;--fg:#2b2a28;--muted:#6f6a63;
+  --accent:#5f8f87;--accent-deep:#4a766f;--accent-soft:#dfe9e5;--on-accent:#fff;
+  --ok:#3d7a5a;--ok-soft:#e2f0e8;--bad:#b3363b;--bad-soft:#f8e1e1;
+  --display:"Montserrat",system-ui,sans-serif;--body:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif;--script:"Sacramento","Brush Script MT",cursive;--r:14px;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--surface:#24221f;--sunk:#1f1d1b;--line:#3a3631;--fg:#f1ece5;--muted:#b3aba1;--accent:#8fbcb3;--accent-deep:#a6cdc5;--accent-soft:#263532;--on-accent:#14201e;--ok:#7cc59d;--ok-soft:#1f3329;--bad:#ef8a8d;--bad-soft:#3d1f21;color-scheme:dark}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 var(--body)}
+.in{max-width:1040px;margin:0 auto;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+a{color:var(--accent-deep)}
+nav.top{padding-block:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{font-weight:700;font-size:21px;letter-spacing:-.01em;text-decoration:none;color:var(--fg)}
+.logo span{color:var(--accent)}
+nav.top .links{display:flex;gap:18px;font-size:13px;font-weight:600;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.06em}
+nav.top .links a{text-decoration:none;color:var(--muted)}
+h1,h2{font-family:var(--display);font-weight:300;text-transform:uppercase;letter-spacing:.02em;text-wrap:balance;margin:0}
+.hero{padding-block:36px 56px;display:grid;grid-template-columns:1.25fr 1fr;gap:44px;align-items:center}
+.hero h1{font-size:clamp(36px,6vw,64px);line-height:1.02}
+.hero h1 b{font-weight:700;display:block}
+.hero .rule{width:120px;height:2px;background:var(--fg);margin:20px 0}
+.hero p{font-size:16px;max-width:46ch;color:var(--muted);margin:0 0 24px}
+.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--on-accent);border:0;border-radius:999px;padding:14px 26px;font:600 14px var(--body);letter-spacing:.04em;text-transform:uppercase;text-decoration:none;cursor:pointer}
+.cta:hover{background:var(--accent-deep)}
+.cta.alt{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.ctas{display:flex;gap:10px;flex-wrap:wrap}
+.retorno{background:var(--accent);color:var(--on-accent);border-radius:var(--r);padding:28px 26px;display:flex;flex-direction:column;gap:14px}
+.retorno .sc{font-family:var(--script);font-size:44px;line-height:.9}
+.retorno .big{display:flex;gap:16px;align-items:center}
+.retorno .big b{font-weight:300;font-size:78px;line-height:1;font-variant-numeric:tabular-nums}
+.retorno .big span{font-size:14px;line-height:1.45}
+.retorno hr{border:0;border-top:1px solid rgba(255,255,255,.35);margin:0;width:100%}
+.retorno ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.retorno ul b{font-weight:700}
+section{padding-block:56px}
+section.band{background:var(--surface);border-block:1px solid var(--line)}
+h2{font-size:clamp(26px,3.6vw,38px);line-height:1.12;margin-bottom:8px}
+.lead{color:var(--muted);max-width:62ch;margin:0 0 30px}
+.beneficios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.ben{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}
+.ben small{text-transform:uppercase;letter-spacing:.08em;font-size:11.5px;font-weight:600;color:var(--muted)}
+.ben b{font-size:34px;font-weight:700;line-height:1.1}
+.ben > span{color:var(--muted);font-size:13.5px;max-width:26ch}
+.passos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:30px 26px;counter-reset:p;list-style:none;padding:0;margin:0}
+.passos li{counter-increment:p;display:flex;flex-direction:column;gap:6px;min-width:0}
+.passos li::before{content:counter(p,decimal-leading-zero);width:54px;height:54px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-size:20px;font-weight:500}
+.passos h3{margin:6px 0 0;font-size:14px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.passos p{margin:0;color:var(--muted);font-size:13.5px}
+.passos .imp{font-size:12.5px;color:var(--fg);background:var(--accent-soft);border-radius:8px;padding:6px 9px;margin-top:4px}
+.dica{margin-top:34px;background:var(--sunk);border-radius:var(--r);padding:16px 20px;font-family:var(--script);font-size:30px;line-height:1.2;text-align:center}
+.req{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.req div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.req b{display:block;margin-bottom:2px;font-weight:600}
+.req span{color:var(--muted);font-size:14px}
+details{border-bottom:1px solid var(--line);padding:4px 0}
+details:first-of-type{border-top:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:12px;text-transform:uppercase;letter-spacing:.04em;font-size:14px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--accent);font-size:20px;line-height:1}
+details[open] summary::after{content:"–"}
+details ul{margin:0 0 16px;padding-left:20px;color:var(--muted);display:flex;flex-direction:column;gap:7px;max-width:74ch}
+details li b{color:var(--fg)}
+.grupo{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:center}
+.grupo ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.grupo .sc{font-family:var(--script);font-size:32px;line-height:1.1;color:var(--accent-deep);margin-top:12px}
+.formwrap{display:grid;grid-template-columns:1fr 1.4fr;gap:40px}
+form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
+label small{font-weight:400;color:var(--muted)}
+input,textarea,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+textarea{min-height:100px;resize:vertical}
+input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.aceite{flex-direction:row;align-items:flex-start;gap:10px;font-weight:400}
+.aceite input{width:auto;margin-top:4px}
+.hp{position:absolute;left:-9999px}
+.msg{border-radius:10px;padding:12px 14px;font-weight:600}
+.msg.err{background:var(--bad-soft);color:var(--bad)}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}
+.sucesso{text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;padding:20px 0}
+.prot{font-family:ui-monospace,Menlo,monospace;font-size:26px;letter-spacing:.08em;background:var(--accent-soft);color:var(--accent-deep);padding:8px 18px;border-radius:10px}
+.status{display:flex;flex-direction:column;gap:12px}
+.status .tit{font-size:22px;font-weight:600}
+.codebox{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border-radius:10px;padding:12px 14px}
+.codebox code{font-size:20px;font-weight:700;color:var(--accent-deep);letter-spacing:.05em}
+.small-btn{font:600 13px var(--body);border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 14px;cursor:pointer}
+.contato{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:var(--on-accent);border-radius:10px;padding:10px 16px;font-weight:500;text-decoration:none}
+footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
+@media (max-width:860px){.hero,.formwrap,.grupo{grid-template-columns:1fr}.hero{padding-block:16px 40px}.passos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.beneficios{grid-template-columns:1fr}}
+@media (max-width:480px){.g2,.passos{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="in">
+  <nav class="top"><a class="logo" href="https://www.floraamar.com.br/">flora <span>amar</span></a>
+    <div class="links"><a href="#como">Como funciona</a><a href="#regulamento">Regulamento</a><a href="#acompanhar">Minha inscrição</a></div></nav>
+  <header class="hero">
+    <div>
+      <h1><b>Programa</b> de afiliadas</h1>
+      <div class="rule"></div>
+      <p>Ganhe um voucher de <strong data-v="voucher">R$ 500</strong> para escolher seus looks, crie conteúdo com a Flora Amar e receba comissão e crédito look em cada venda feita com o seu cupom.</p>
+      <div class="ctas"><a class="cta" href="#inscricao">Quero ser afiliada</a><a class="cta alt" href="#regulamento">Ler o regulamento</a></div></div>
+    <div class="retorno">
+      <div class="sc">Total de retorno</div>
+      <div class="big"><b data-v="total">15%</b><span>sobre as vendas geradas com o seu cupom</span></div>
+      <hr>
+      <ul><li><b data-v="comissao">5%</b> de comissão sobre as vendas</li><li><b data-v="credito">10%</b> em crédito look para novas compras</li><li><b data-v="voucher">R$ 500</b> em voucher para o seu primeiro pedido</li></ul>
+    </div>
+  </header>
+</div>
+
+<section class="band"><div class="in">
+  <h2>Benefícios da afiliada</h2><p class="lead">Ao fazer parte do Programa de Afiliadas, você recebe:</p>
+  <div class="beneficios">
+    <div class="ben"><small>Cupom exclusivo</small><b><span data-v="desconto">5%</span> OFF</b><span>para compartilhar com as suas seguidoras</span></div>
+    <div class="ben"><small>Comissão</small><b data-v="comissao">5%</b><span>sobre todas as vendas realizadas através do seu cupom</span></div>
+    <div class="ben"><small>Crédito look</small><b data-v="credito">10%</b><span>do valor convertido em vendas, para usar em novas compras no site</span></div>
+  </div>
+</div></section>
+
+<section id="como"><div class="in">
+  <h2>Como funciona a parceria</h2><p class="lead">O passo a passo da inscrição até o seu crédito look de todo mês. Você acompanha cada etapa nesta página com o seu protocolo.</p>
+  <ol class="passos">
+    <li><h3>Inscreva-se</h3><p>Preencha o formulário abaixo. Você recebe um protocolo na hora e a resposta pelo WhatsApp.</p></li>
+    <li><h3>Escolha seus looks</h3><p>Aprovada, você ganha um voucher de <span data-v="voucher">R$ 500</span> para escolher seus looks no site da Flora Amar.</p></li>
+    <li><h3>Receba suas peças</h3><p>Enviamos o seu pedido. Assim que receber, é hora do conteúdo.</p></li>
+    <li><h3>Conteúdo de recebidos</h3><p>Em até <span data-v="prazo">15 dias</span>: “Recebidos Flora Amar”, “Experimentando looks fitness”, “O que eu pedi x o que eu recebi” ou outro formato criativo.</p><p class="imp">Importante: não divulgue o seu cupom neste conteúdo.</p></li>
+    <li><h3>Marque a Flora Amar</h3><p>Marque o <a href="https://www.instagram.com/floraamaroficial/" target="_blank" rel="noopener">@floraamaroficial</a> em todos os posts relacionados às peças.</p></li>
+    <li><h3>Receba seu cupom</h3><p>Com o vídeo de recebidos publicado, liberamos o seu cupom exclusivo de <span data-v="desconto">5%</span> OFF e você entra no grupo de afiliadas.</p></li>
+    <li><h3>Produza e envie</h3><p>Produza <b>2 vídeos por mês</b> e envie para o WhatsApp do marketing: <b data-v="whatsMkt">(11) 92040-3050</b>.</p></li>
+    <li><h3>Venda e receba</h3><p>Divulgue o cupom nos seus conteúdos e stories. Todo mês você recebe <span data-v="credito">10%</span> do valor convertido em crédito look.</p></li>
+  </ol>
+  <div class="dica">Crie um destaque “Flora Amar” no seu Instagram para reunir todos os conteúdos da marca</div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Quem pode participar</h2><p class="lead">Buscamos criadoras de conteúdo que combinam com o estilo da marca.</p>
+  <div class="req">
+    <div><b>Perfil público</b><span>Instagram ou TikTok aberto, com pelo menos <span data-v="min">1.000</span> seguidores.</span></div>
+    <div><b>Conteúdo constante</b><span>Disponibilidade para produzir 2 vídeos por mês com as peças.</span></div>
+    <div><b>Compromisso com vendas</b><span>Meta mínima de <span data-v="meta">R$ 500</span> em vendas por mês com o seu cupom.</span></div>
+  </div>
+</div></section>
+
+<section id="regulamento"><div class="in">
+  <h2>Regulamento e diretrizes</h2><p class="lead">Ao se inscrever, você concorda com as regras abaixo.</p>
+  <details open><summary>Primeiro pedido: voucher de looks</summary><ul>
+    <li>Aprovada, você recebe um voucher de <b data-v="voucher">R$ 500</b> para escolher seus looks em <a href="https://www.floraamar.com.br/" target="_blank" rel="noopener">floraamar.com.br</a>.</li>
+    <li>O voucher é de uso único e vale por <b data-v="validade">30 dias</b> a partir da aprovação. Se o pedido passar do valor do voucher, você paga só a diferença.</li>
+  </ul></details>
+  <details><summary>Conteúdos</summary><ul>
+    <li>Depois de receber as peças, publique um conteúdo de recebidos em até <b data-v="prazo">15 dias</b> e envie o link pela área “Minha inscrição” desta página.</li>
+    <li>Não divulgue o seu cupom no conteúdo de recebidos.</li>
+    <li>Marque o <b>@floraamaroficial</b> em todos os posts relacionados às peças.</li>
+    <li>Produza <b>2 vídeos por mês</b>. Esses conteúdos poderão ser usados em campanhas, redes sociais e anúncios da marca.</li>
+    <li>Após publicar, envie os conteúdos para o WhatsApp da equipe de marketing: <b data-v="whatsMkt">(11) 92040-3050</b>.</li>
+    <li>A Flora Amar não compartilha conteúdos que contenham o cupom de desconto. Sempre que quiser que a gente reposte, marque a marca sem divulgar o cupom.</li>
+  </ul></details>
+  <details><summary>Cupom, comissão e crédito look</summary><ul>
+    <li>O cupom exclusivo dá <b data-v="desconto">5%</b> de desconto para as suas seguidoras e pode ser usado em outros conteúdos, stories e estratégias de divulgação.</li>
+    <li>Você recebe <b data-v="comissao">5%</b> de comissão sobre todas as vendas realizadas através do seu cupom, pelo programa de afiliados da plataforma da loja (wBuy).</li>
+    <li>O crédito look é de <b data-v="credito">10%</b> do valor convertido através do seu cupom, calculado e disponibilizado mensalmente para novas compras no site.</li>
+    <li>No total, o retorno é de <b data-v="total">15%</b> sobre as vendas geradas: <span data-v="comissao">5%</span> de comissão + <span data-v="credito">10%</span> em crédito look.</li>
+  </ul></details>
+  <details><summary>Meta e permanência</summary><ul>
+    <li>A afiliada deverá atingir uma meta mínima de <b data-v="meta">R$ 500</b> em vendas por mês através do seu cupom. Esse valor garante a permanência no programa.</li>
+    <li>Durante os 3 primeiros meses, acompanhamos o desempenho da parceria. Caso não haja conversão, a meta mínima não seja atingida de forma recorrente ou os resultados estejam muito abaixo do esperado, a parceria será encerrada.</li>
+    <li>Após os 3 primeiros meses, com resultados positivos e bom desempenho, a parceria passa a ter prazo indeterminado, enquanto houver comprometimento com a produção de conteúdo, cumprimento das diretrizes e resultados compatíveis com a parceria.</li>
+  </ul></details>
+</div></section>
+
+<section class="band"><div class="in grupo">
+  <div><h2>Grupo de afiliadas</h2><p class="lead" style="margin-bottom:0">Todas as afiliadas fazem parte de um grupo exclusivo no WhatsApp, onde compartilhamos:</p></div>
+  <div><ul><li>Lançamentos</li><li>Campanhas</li><li>Ações promocionais</li><li>Orientações sobre conteúdos</li><li>Informações importantes sobre a parceria</li></ul>
+    <div class="sc">Assim que sua parceria for confirmada, você será adicionada.</div></div>
+</div></section>
+
+<section id="inscricao"><div class="in formwrap">
+  <div><h2>Inscreva-se</h2><p class="lead">Leva 3 minutos. Guarde o protocolo que aparece no final: com ele e o seu e-mail você acompanha tudo em “Minha inscrição”.</p>
+    <p class="lead" style="margin-bottom:10px">Dúvidas? Fale com a equipe:</p>
+    <a class="contato" id="waLink" href="https://wa.me/5511920403050" target="_blank" rel="noopener">WhatsApp <span data-v="whatsMkt">(11) 92040-3050</span></a></div>
+  <form id="form" novalidate>
+    <div id="formBody" style="display:flex;flex-direction:column;gap:14px">
+    <label>Nome completo<input id="nome" name="nome" required autocomplete="name"></label>
+    <div class="g2"><label>Instagram<input id="instagram" name="instagram" required placeholder="@seuperfil"></label><label>TikTok <small>opcional</small><input id="tiktok" name="tiktok" placeholder="@seuperfil"></label></div>
+    <div class="g2"><label>Seguidores <small>no maior perfil</small><input id="seguidores" name="seguidores" required inputmode="numeric" placeholder="ex.: 4500"></label><label>Cidade / UF<input id="cidade" name="cidade" required placeholder="São Paulo / SP"></label></div>
+    <div class="g2"><label>WhatsApp<input id="whatsapp" name="whatsapp" required type="tel" autocomplete="tel" placeholder="(11) 90000-0000"></label><label>E-mail<input id="email" name="email" required type="email" autocomplete="email"></label></div>
+    <div class="g2"><label>Seu nicho de conteúdo<input id="nicho" name="nicho" placeholder="fitness, moda, rotina…"></label><label>Tamanho que você veste<select id="tamanho" name="tamanho"><option value="">Selecione</option><option>PP</option><option>P</option><option>M</option><option>G</option><option>GG</option></select></label></div>
+    <label>Sua proposta de conteúdo<small>Como seria o seu vídeo de recebidos e os seus 2 vídeos por mês?</small><textarea id="proposta" name="proposta" required></textarea></label>
+    <input class="hp" name="site" id="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <label class="aceite"><input type="checkbox" id="aceite" name="aceite"><span>Li e aceito o <a href="#regulamento">regulamento e as diretrizes</a> do Programa de Afiliadas Flora Amar.</span></label>
+    <div id="formMsg" hidden></div>
+    <button class="cta" type="submit" id="enviar">Enviar inscrição</button>
+    </div>
+  </form>
+</div></section>
+
+<section class="band" id="acompanhar"><div class="in formwrap">
+  <div><h2>Minha inscrição</h2><p class="lead">Veja em que etapa você está, pegue o seu voucher ou cupom e envie o link do vídeo de recebidos.</p></div>
+  <form id="formStatus" novalidate>
+    <div class="g2"><label>Protocolo<input id="sProt" required placeholder="FA1A2B3C" autocomplete="off"></label><label>E-mail da inscrição<input id="sEmail" type="email" required autocomplete="email"></label></div>
+    <button class="cta" type="submit">Ver minha inscrição</button>
+    <div id="statusOut"></div>
+  </form>
+</div></section>
+
+<footer><div class="in">Flora Amar · be the best you · <a href="https://www.floraamar.com.br/">floraamar.com.br</a> · <a href="https://www.instagram.com/floraamaroficial/" target="_blank" rel="noopener">@floraamaroficial</a></div></footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const fmtD=d=>d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):"";
+fetch("/api/config-publica").then(r=>r.json()).then(c=>{
+  const set=(k,v)=>document.querySelectorAll(`[data-v="${k}"]`).forEach(e=>e.textContent=v);
+  set("voucher",brl(c.voucherValor));set("desconto",c.desconto+"%");set("comissao",c.comissao+"%");set("credito",c.creditoLook+"%");set("total",(Number(c.comissao)+Number(c.creditoLook))+"%");
+  set("prazo",c.prazoDias+" dias");set("validade",c.validadeVoucherDias+" dias");set("min",Number(c.minSeguidores).toLocaleString("pt-BR"));set("meta",brl(c.metaMensal));set("whatsMkt",c.whatsapp);
+  $("#waLink").href="https://wa.me/55"+String(c.whatsapp).replace(/\D/g,"");
+  if(!c.inscricoesAbertas){$("#formBody").innerHTML=`<div class="msg err">As inscrições estão fechadas no momento. Volte em breve!</div>`}
+}).catch(()=>{});
+async function post(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});const j=await r.json().catch(()=>({erro:"Erro de conexão. Tente de novo."}));if(!r.ok)throw new Error(j.erro||"Erro");return j}
+$("#form").addEventListener("submit",async e=>{
+  e.preventDefault();const f=e.target;const m=$("#formMsg");const b=$("#enviar");
+  const d=Object.fromEntries(new FormData(f));d.aceite=$("#aceite").checked;
+  const falt=["nome","instagram","seguidores","cidade","whatsapp","email","proposta"].filter(k=>!String(d[k]||"").trim());
+  if(falt.length){m.hidden=false;m.className="msg err";m.textContent="Preencha todos os campos obrigatórios.";$("#"+falt[0]).focus();return}
+  if(!d.aceite){m.hidden=false;m.className="msg err";m.textContent="Para continuar, aceite o regulamento do programa.";return}
+  b.disabled=true;b.textContent="Enviando…";
+  try{const j=await post("/api/inscricao",d);
+    $("#formBody").innerHTML=`<div class="sucesso"><h2>Inscrição enviada!</h2><p>Seu protocolo é</p><div class="prot">${esc(j.protocolo)}</div><p class="lead" style="margin:0">Guarde este número. Use-o com o seu e-mail em “Minha inscrição” para ver a resposta.</p></div>`;
+    $("#sProt").value=j.protocolo;$("#sEmail").value=d.email;
+  }catch(err){m.hidden=false;m.className="msg err";m.textContent=err.message;b.disabled=false;b.textContent="Enviar inscrição"}
+});
+async function copiar(t){try{await navigator.clipboard.writeText(t)}catch(e){}}
+function renderStatus(s){
+  let h=`<div class="status"><div><small style="color:var(--muted)">Olá, ${esc((s.nome||"").split(" ")[0])} · ${esc(s.protocolo)}</small><div class="tit">${esc(s.titulo)}</div><p style="margin:4px 0 0;color:var(--muted)">${esc(s.texto)}</p></div>`;
+  if(s.voucher)h+=`<div class="codebox"><div><small>Voucher de ${brl(s.voucher.valor)} · válido até ${fmtD(s.voucher.validade)}</small><br><code>${esc(s.voucher.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.voucher.codigo)}">Copiar</button></div><a class="cta alt" href="https://www.floraamar.com.br/" target="_blank" rel="noopener">Escolher meus looks</a>`;
+  if(s.envio)h+=`<p>Envio: <b>${esc(s.envio.metodo||"")}</b>${s.envio.rastreio?` · rastreio <b>${esc(s.envio.rastreio)}</b>`:""}</p>`;
+  if(s.prazoVideo)h+=`<p>Prazo para postar o vídeo de recebidos: <b>${fmtD(s.prazoVideo)}</b>. Lembre de marcar o @floraamaroficial e não divulgar cupom neste vídeo.</p><label>Link do vídeo publicado<input id="vLink" type="url" placeholder="https://www.instagram.com/reel/…" value="${esc(s.videoLink||"")}"></label><button type="button" class="cta" id="vEnviar">${s.videoLink?"Atualizar link":"Enviar link do vídeo"}</button>${s.videoLink?`<div class="msg ok">Link recebido. Vamos conferir e liberar seu cupom.</div>`:""}`;
+  if(s.cupom)h+=`<div class="codebox"><div><small>Seu cupom · ${s.cupom.desconto}% OFF para suas seguidoras · ${s.cupom.comissao}% de comissão + ${s.cupom.creditoLook ?? 10}% em crédito look</small><br><code>${esc(s.cupom.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.cupom.codigo)}">Copiar</button></div><p style="margin:0">Lembre: 2 vídeos por mês, enviados para o WhatsApp do marketing.</p>`;
+  h+=`<p style="color:var(--muted);font-size:13px;margin:0">Dúvidas: WhatsApp ${esc(s.whatsapp)}</p></div>`;
+  $("#statusOut").innerHTML=h;
+}
+async function buscar(){const o=$("#statusOut");o.innerHTML=`<p style="color:var(--muted)">Buscando…</p>`;
+  try{renderStatus(await post("/api/status",{protocolo:$("#sProt").value,email:$("#sEmail").value}))}catch(err){o.innerHTML=`<div class="msg err">${esc(err.message)}</div>`}}
+$("#formStatus").addEventListener("submit",e=>{e.preventDefault();buscar()});
+document.addEventListener("click",async e=>{
+  const c=e.target.closest("[data-copy]");if(c){await copiar(c.dataset.copy);c.textContent="Copiado";return}
+  if(e.target.id==="vEnviar"){const b=e.target;b.disabled=true;
+    try{renderStatus(await post("/api/video",{protocolo:$("#sProt").value,email:$("#sEmail").value,videoLink:$("#vLink").value}))}catch(err){b.disabled=false;b.insertAdjacentHTML("afterend",`<div class="msg err">${esc(err.message)}</div>`)}}
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex">
+<title>Painel de Afiliadas · Flora Amar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout: cabeçalho com resumo do funil, faixa de etapas como filtro, lista de cartões; ficha da afiliada abre em painel lateral */
+:root{
+  --bg:#efe8de; --surface:#f8f4ee; --sunk:#e6ddd1; --line:#d9cec0;
+  --fg:#2b2a28; --muted:#6f6a63;
+  --accent:#5f8f87; --accent-soft:#dfe9e5; --on-accent:#ffffff;
+  --ok:#3d7a5a; --ok-soft:#e2f0e8; --warn:#a8650f; --warn-soft:#fbeedb; --bad:#b3363b; --bad-soft:#f8e1e1;
+  --display:"Montserrat", system-ui, sans-serif;
+  --body:"Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#181216; --surface:#221a1f; --sunk:#1d161a; --line:#3a2e35; --fg:#f2e9ee; --muted:#b09fa9;
+  --accent:#8fbcb3; --accent-soft:#263532; --on-accent:#14201e;
+  --ok:#7cc59d; --ok-soft:#1f3329; --warn:#e8b05f; --warn-soft:#3a2b17; --bad:#ef8a8d; --bad-soft:#3d1f21; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#181216; --surface:#221a1f; --sunk:#1d161a; --line:#3a2e35; --fg:#f2e9ee; --muted:#b09fa9;
+  --accent:#8fbcb3; --accent-soft:#263532; --on-accent:#14201e;
+  --ok:#7cc59d; --ok-soft:#1f3329; --warn:#e8b05f; --warn-soft:#3a2b17; --bad:#ef8a8d; --bad-soft:#3d1f21; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between}
+.brand small{display:block;text-transform:uppercase;letter-spacing:.14em;font-size:11px;color:var(--muted);font-weight:600}
+.brand h1{font-family:var(--display);font-weight:500;font-size:clamp(28px,4vw,40px);margin:2px 0 0;line-height:1.05;text-wrap:balance}
+.brand h1 em{color:var(--accent)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;font-weight:600;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 16px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.ghost{background:transparent}
+button.danger{color:var(--bad)}
+button.small{padding:5px 12px;font-size:12.5px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.terms{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.terms b{color:var(--fg);font-variant-numeric:tabular-nums}
+.alert{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--bad-soft);color:var(--bad);border-radius:var(--r);padding:10px 14px;font-weight:600}
+.funnel{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;overflow-x:auto}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 10px 9px;text-align:left;min-width:0;display:flex;flex-direction:column;gap:2px;border-radius:var(--r)}
+.stage .n{font-family:var(--display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.stage .l{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.25}
+.stage .s{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.stage.on{border-color:var(--accent);background:var(--accent-soft)}
+@media (max-width:820px){.funnel{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:420px){.funnel{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.toolbar input{flex:1;min-width:180px}
+input,textarea,select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{min-height:70px;resize:vertical}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;min-width:0}
+.card:hover{border-color:var(--accent)}
+.card .row{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.card h3{margin:0;font-size:16px;font-weight:700;overflow-wrap:anywhere}
+.card .ig{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.card .next{font-size:12.5px;color:var(--muted)}
+.card .codes{display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.pill.a{background:var(--accent-soft);color:var(--accent)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--sunk);border-radius:6px;padding:2px 8px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:34px 20px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty h2{font-family:var(--display);font-weight:500;color:var(--fg);margin:0;font-size:24px}
+.empty p{max-width:52ch;margin:0}
+.status{color:var(--muted);font-size:12.5px}
+/* painel */
+.scrim{position:fixed;inset:0;background:rgba(20,10,16,.38);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--bg);z-index:21;overflow-y:auto;border-left:1px solid var(--line);
+  padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(40px + env(safe-area-inset-bottom,0px));padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.drawer h2{font-family:var(--display);font-weight:500;font-size:28px;margin:0;line-height:1.1;overflow-wrap:anywhere}
+.dhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps span{flex:1;min-width:52px;height:5px;border-radius:3px;background:var(--line)}
+.steps span.done{background:var(--accent)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.box h4{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.box.focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:460px){.grid2{grid-template-columns:1fr}}
+.kv{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.kv .v{font-weight:700;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.check input{width:auto;margin-top:3px}
+ol.how{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.msg{white-space:pre-wrap;background:var(--sunk);border-radius:8px;padding:10px 12px;font-size:13px}
+.hist{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;z-index:40}
+.note{font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
+[hidden]{display:none!important}
+a.btn{display:inline-flex;align-items:center}
+</style>
+</head><body>
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div class="brand"><small>Flora Amar · programa de afiliadas</small><h1>Afiliadas <em>Flora</em></h1></div>
+    <div class="actions">
+      <a class="btn ghost" href="/" target="_blank" rel="noopener" style="text-decoration:none">Ver página pública</a>
+      <button id="btnConfig" class="ghost">Regras do programa</button>
+      <button id="btnNova" class="primary">+ Nova afiliada</button>
+      <button id="btnSair" class="ghost small">Sair</button>
+    </div>
+  </header>
+  <div class="terms" id="terms"></div>
+  <div id="alertBox" hidden></div>
+  <nav class="funnel" id="funnel" aria-label="Etapas"></nav>
+  <div class="toolbar">
+    <input id="busca" type="search" placeholder="Buscar por nome, @instagram, protocolo, cupom ou pedido">
+    <select id="ordem" style="width:auto"><option value="recente">Mais recentes</option><option value="prazo">Prazo do vídeo</option><option value="nome">Nome A–Z</option></select>
+  </div>
+  <div id="status" class="status">Carregando afiliadas…</div>
+  <div id="list" class="list"></div>
+</div>
+<div class="wrap" id="login" hidden style="max-width:420px;padding-top:12vh">
+  <div class="brand"><small>Flora Amar</small><h1>Painel de <em>afiliadas</em></h1></div>
+  <form class="box" id="loginForm"><label class="f">Senha do painel<input id="senha" type="password" autocomplete="current-password" required></label><div id="loginMsg" class="note"></div><button class="primary" type="submit">Entrar</button></form>
+</div>
+<div id="drawerRoot"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+const ETAPAS=[
+  {k:"proposta",l:"Propostas recebidas",s:"1",next:"Avaliar e aprovar"},
+  {k:"aprovada",l:"Aprovada · voucher",s:"2",next:"Cadastrar voucher na wBuy e aguardar a compra"},
+  {k:"compra",l:"Looks comprados",s:"3",next:"Enviar os looks"},
+  {k:"enviado",l:"Looks a caminho",s:"4",next:"Confirmar a entrega"},
+  {k:"entregue",l:"Aguardando vídeo",s:"5",next:"Aguardar o link do vídeo"},
+  {k:"video",l:"Vídeo recebido",s:"6",next:"Criar cupom e comissão na wBuy"},
+  {k:"ativa",l:"Afiliada ativa",s:"7",next:"Acompanhar vendas"},
+  {k:"recusada",l:"Recusadas",s:"–",next:""}
+];
+const IDX=Object.fromEntries(ETAPAS.map((e,i)=>[e.k,i]));
+const DEF={voucherValor:500,desconto:5,comissao:5,prazoDias:15,validadeVoucherDias:30,minSeguidores:1000,creditoLook:10,metaMensal:500,whatsapp:"(11) 92040-3050",inscricoesAbertas:true};
+let cfg={...DEF}, rows=[], filtro=null, aberta=null, draft=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const hoje=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const fmtD=d=>d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):"—";
+const addDias=(d,n)=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const diasAte=d=>Math.round((new Date(d+"T12:00:00")-new Date(hoje()+"T12:00:00"))/864e5);
+const primeiroNome=n=>(n||"").trim().split(/\s+/)[0]||"";
+const slug=n=>primeiroNome(n).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,12)||"FLORA";
+const waNum=w=>{let d=String(w||"").replace(/\D/g,"");if(d.length<=11)d="55"+d;return d};
+function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2400)}
+async function copiar(t,btn){try{await navigator.clipboard.writeText(t);toast("Copiado")}catch(e){const n=btn?.closest(".box")?.querySelector(".msg");if(n){const r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r)}toast("Selecionado: use Ctrl+C")}}
+function codigoUnico(base,id){const usados=new Set(rows.filter(r=>r.id!==id).flatMap(r=>[r.voucher?.codigo,r.cupom?.codigo]).filter(Boolean));let c=base,i=2;while(usados.has(c)){c=base+i;i++}return c}
+
+async function api(m,u,b){const r=await fetch(u,{method:m,headers:b?{"Content-Type":"application/json"}:{},body:b?JSON.stringify(b):undefined});
+  if(r.status===401){mostrarLogin();throw new Error("login")}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.erro||"Erro");return j}
+async function carregar(){
+  try{const [l,c]=await Promise.all([api("GET","/api/admin/afiliadas"),api("GET","/api/admin/config")]);rows=l;cfg={...DEF,...c};
+    $("#login").hidden=true;$("#app").hidden=false;$("#status").hidden=true;renderTop();renderList();}
+  catch(e){if(e.message!=="login"){$("#status").hidden=false;$("#status").textContent="Não foi possível carregar. Verifique a conexão."}}
+}
+function mostrarLogin(){$("#app").hidden=true;$("#login").hidden=false;fechar();setTimeout(()=>$("#senha").focus(),50)}
+$("#loginForm").addEventListener("submit",async e=>{e.preventDefault();try{await api("POST","/api/login",{senha:$("#senha").value});$("#senha").value="";carregar()}catch(err){$("#loginMsg").textContent=err.message==="login"?"Senha incorreta.":err.message}});
+
+/* ---------- render ---------- */
+function prazoInfo(r){
+  if(r.etapa!=="entregue"||!r.prazoVideo) return null;
+  if(r.videoLink) return {cls:"ok",t:"Vídeo enviado: conferir"};
+  const d=diasAte(r.prazoVideo);
+  if(d<0) return {cls:"bad",t:`Vídeo atrasado ${-d} dia${-d>1?"s":""}`};
+  if(d<=3) return {cls:"warn",t:d===0?"Vídeo vence hoje":`Vídeo vence em ${d} dia${d>1?"s":""}`};
+  return {cls:"a",t:`Vídeo até ${fmtD(r.prazoVideo)}`};
+}
+function renderTop(){
+  $("#terms").innerHTML=`<span>Voucher <b>${brl(cfg.voucherValor)}</b></span><span>Desconto clientes <b>${cfg.desconto}%</b></span><span>Comissão <b>${cfg.comissao}%</b></span><span>Crédito look <b>${cfg.creditoLook}%</b></span><span>Meta <b>${brl(cfg.metaMensal)}</b>/mês</span><span>Vídeo em <b>${cfg.prazoDias} dias</b></span><span>Mínimo <b>${Number(cfg.minSeguidores).toLocaleString("pt-BR")}</b> seguidores</span><span>Inscrições <b>${cfg.inscricoesAbertas?"abertas":"fechadas"}</b></span>`;
+  const cont=Object.fromEntries(ETAPAS.map(e=>[e.k,0]));rows.forEach(r=>cont[r.etapa]=(cont[r.etapa]||0)+1);
+  $("#funnel").innerHTML=ETAPAS.map(e=>`<button class="stage ${filtro===e.k?"on":""}" data-k="${e.k}" aria-pressed="${filtro===e.k}"><span class="s">${e.s}</span><span class="n">${cont[e.k]}</span><span class="l">${e.l}</span></button>`).join("");
+  const atras=rows.filter(r=>r.etapa==="entregue"&&r.prazoVideo&&!r.videoLink&&diasAte(r.prazoVideo)<0);
+  const conferir=rows.filter(r=>r.etapa==="entregue"&&r.videoLink);
+  const ab=$("#alertBox");let h="";
+  if(atras.length)h+=`<div class="alert">${atras.length} vídeo${atras.length>1?"s":""} atrasado${atras.length>1?"s":""}: ${atras.map(r=>esc(primeiroNome(r.nome))).join(", ")} <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
+  if(conferir.length)h+=`<div class="alert" style="background:var(--ok-soft);color:var(--ok);margin-top:8px">${conferir.length} vídeo${conferir.length>1?"s":""} enviado${conferir.length>1?"s":""} pelas afiliadas para conferir <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
+  ab.hidden=!h;ab.innerHTML=h;
+}
+function renderList(){
+  const q=$("#busca").value.trim().toLowerCase();
+  let l=rows.filter(r=>!filtro||r.etapa===filtro);
+  if(q) l=l.filter(r=>[r.nome,r.instagram,r.tiktok,r.protocolo,r.voucher?.codigo,r.cupom?.codigo,r.pedido,r.whatsapp,r.email].join(" ").toLowerCase().includes(q));
+  const o=$("#ordem").value;
+  l.sort((a,b)=>o==="nome"?(a.nome||"").localeCompare(b.nome||""):o==="prazo"?((a.prazoVideo||"9999")<(b.prazoVideo||"9999")?-1:1):(b.criadoEm||"").localeCompare(a.criadoEm||""));
+  const st=$("#status");
+  if(!rows.length){st.hidden=true;$("#list").innerHTML=`<div class="empty" style="grid-column:1/-1"><h2>Nenhuma inscrição ainda</h2><p>As inscrições feitas na página pública aparecem aqui em “Propostas recebidas”. Divulgue o link da página na bio e nos stories.</p><div class="btnrow" style="justify-content:center"><button class="primary" data-copylink="1">Copiar link da página de inscrição</button></div></div>`;return}
+  st.hidden=!(filtro||q);st.textContent=`${l.length} afiliada${l.length!==1?"s":""} ${filtro?"em “"+ETAPAS[IDX[filtro]].l+"”":""}`;
+  $("#list").innerHTML=l.length?l.map(r=>{
+    const e=ETAPAS[IDX[r.etapa]]||ETAPAS[0];const p=prazoInfo(r);
+    const pcls=r.etapa==="ativa"?"ok":r.etapa==="recusada"?"":"a";
+    return `<button class="card" data-id="${esc(r.id)}"><div class="row"><div style="min-width:0"><h3>${esc(r.nome||"Sem nome")}</h3><div class="ig">${esc(r.instagram||"")}${r.seguidores?" · "+Number(r.seguidores).toLocaleString("pt-BR")+" seguidores":""}</div></div><span class="pill ${pcls}">${esc(e.l)}</span></div>
+    ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}
+    <div class="codes"><span class="code">${esc(r.protocolo||"")}</span>${r.voucher?.codigo?`<span class="code">${esc(r.voucher.codigo)}</span>`:""}${r.cupom?.codigo?`<span class="code">${esc(r.cupom.codigo)}</span>`:""}</div>
+    ${e.next?`<div class="next">Próximo passo: ${esc(e.next)}</div>`:""}</button>`}).join(""):`<div class="empty" style="grid-column:1/-1"><p>Nenhuma afiliada encontrada com esse filtro.</p></div>`;
+}
+
+/* ---------- ficha ---------- */
+function abrir(id){aberta=id;const r=rows.find(x=>x.id===id);draft=JSON.parse(JSON.stringify(r||{}));renderDrawer()}
+function fechar(){aberta=null;draft=null;$("#drawerRoot").innerHTML=""}
+const val=k=>k.split(".").reduce((o,p)=>o?.[p],draft);
+function campo(k,label,type="text",ph=""){const v=val(k)??"";return `<label class="f">${label}${type==="textarea"?`<textarea data-f="${k}" id="f-${k}" placeholder="${esc(ph)}">${esc(v)}</textarea>`:`<input data-f="${k}" id="f-${k}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}">`}</label>`}
+function chk(k,label){return `<label class="check"><input type="checkbox" data-c="${k}" id="c-${k}" ${val(k)?"checked":""}><span>${label}</span></label>`}
+function msgs(r){
+  const n=primeiroNome(r.nome)||"tudo bem";const site=location.origin;
+  return {
+    aprovada:`Oi, ${n}! 🌸 Sua inscrição para ser afiliada Flora Amar foi APROVADA!\n\nVocê ganhou um voucher de ${brl(r.voucher?.valor??cfg.voucherValor)} para escolher seus looks em www.floraamar.com.br\n\nSeu código: ${r.voucher?.codigo||""}\nUse no carrinho, válido até ${fmtD(r.voucher?.validade)}.\n\nDepois que os looks chegarem, você tem ${r.prazoDias??cfg.prazoDias} dias para postar o seu conteúdo de recebidos marcando o @floraamaroficial (sem divulgar cupom nesse vídeo). Quando postar, envie o link em ${site}/#acompanhar com o protocolo ${r.protocolo||""}. 💕`,
+    entregue:`Oi, ${n}! Seus looks Flora Amar chegaram 💐\n\nO conteúdo de recebidos vai até ${fmtD(r.prazoVideo)}. Quando postar, envie o link em ${site}/#acompanhar (protocolo ${r.protocolo||""}) para liberarmos seu cupom de afiliada. 😊`,
+    cobranca:`Oi, ${n}! Tudo bem? Passando para lembrar do vídeo com os looks Flora Amar, o prazo era ${fmtD(r.prazoVideo)}. Consegue postar nos próximos dias? Assim já libero seu cupom de afiliada com comissão. 💕`,
+    ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe ${r.cupom?.comissao??cfg.comissao}% de comissão + ${r.cupom?.creditoLook??cfg.creditoLook}% em crédito look por mês sobre as vendas com ele.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
+    recusada:`Oi, ${n}! Obrigada pelo interesse no programa de afiliadas Flora Amar 🌸 Desta vez seu perfil não se encaixou no que buscamos, mas seguimos juntas por lá!`
+  };
+}
+function blocoMsg(titulo,texto,whats){return `<div class="box"><div class="kv"><h4>${titulo}</h4><div class="btnrow"><button class="small" data-copy>Copiar</button>${whats?`<a class="btn small" style="text-decoration:none;padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener" href="https://wa.me/${waNum(whats)}?text=${encodeURIComponent(texto)}">Enviar no WhatsApp</a>`:""}</div></div><div class="msg">${esc(texto)}</div></div>`}
+function renderDrawer(){
+  const r=draft;if(!r)return;const novo=!r.id;const i=IDX[r.etapa||"proposta"];const M=msgs(r);const p=prazoInfo(r);const W=r.whatsapp;
+  const passos=ETAPAS.slice(0,7).map((e,j)=>`<span class="${r.etapa!=="recusada"&&j<=i?"done":""}" title="${e.l}"></span>`).join("");
+  let h=`<div class="dhead"><div style="min-width:0"><span class="pill ${r.etapa==="ativa"?"ok":"a"}">${novo?"Nova afiliada":esc(ETAPAS[i].l)}</span>${r.protocolo?` <span class="code">${esc(r.protocolo)}</span>`:""}<h2>${esc(r.nome||"Nova afiliada")}</h2></div><button class="ghost small" id="fechar" aria-label="Fechar">Fechar</button></div>
+  ${novo?"":`<div class="steps">${passos}</div>`}${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}`;
+  const igUrl=r.instagram?("https://instagram.com/"+String(r.instagram).replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//,"")):"";
+  h+=`<div class="box ${r.etapa==="proposta"?"focus":""}"><div class="kv"><h4>Inscrição</h4>${igUrl?`<a href="${esc(igUrl)}" target="_blank" rel="noopener" class="note">Abrir Instagram ↗</a>`:""}</div><div class="grid2">${campo("nome","Nome completo")}${campo("instagram","Instagram","text","@usuaria")}${campo("tiktok","TikTok","text","@usuaria")}${campo("seguidores","Seguidores","number")}${campo("whatsapp","WhatsApp","tel","(11) 9…")}${campo("email","E-mail","email")}${campo("cidade","Cidade / UF")}${campo("tamanho","Tamanho")}</div>
+  ${campo("nicho","Nicho de conteúdo")}${campo("proposta","Proposta de conteúdo","textarea")}${r.origem?`<p class="note">Origem: ${esc(r.origem)}${r.aceitePoliticasEm?" · aceitou as políticas em "+new Date(r.aceitePoliticasEm).toLocaleDateString("pt-BR"):""}</p>`:""}</div>`;
+
+  if(!novo && i>=1 && r.etapa!=="recusada"){
+    h+=`<div class="box ${r.etapa==="aprovada"?"focus":""}"><h4>Voucher para os looks</h4>
+    <div class="kv"><span>Código</span><span class="code">${esc(r.voucher?.codigo)}</span></div>
+    <div class="kv"><span>Valor</span><span class="v">${brl(r.voucher?.valor)}</span></div>
+    <div class="kv"><span>Válido até</span><span class="v">${fmtD(r.voucher?.validade)}</span></div>
+    <ol class="how"><li>wBuy → Marketing → Cupons de desconto → Novo cupom</li><li>Código <b>${esc(r.voucher?.codigo)}</b>, desconto em <b>valor fixo de ${brl(r.voucher?.valor)}</b></li><li>Limite de <b>1 uso</b>, validade até ${fmtD(r.voucher?.validade)}</li></ol>
+    ${chk("voucher.cadastradoWbuy","Voucher cadastrado na wBuy")}${campo("pedido","Nº do pedido da afiliada na wBuy")}</div>`;
+    if(r.etapa==="aprovada")h+=blocoMsg("Mensagem de aprovação",M.aprovada,W);
+  }
+  if(!novo && i>=2 && r.etapa!=="recusada"){
+    h+=`<div class="box ${["compra","enviado"].includes(r.etapa)?"focus":""}"><h4>Envio dos looks</h4><div class="grid2"><label class="f">Forma de envio<select data-f="envioMetodo" id="f-envioMetodo">${["Flora Entrega","Correios","Transportadora","Retirada"].map(o=>`<option ${r.envioMetodo===o?"selected":""}>${o}</option>`).join("")}</select></label>${campo("rastreio","Código de rastreio")}${campo("enviadoEm","Enviado em","date")}${i>=3?campo("entregueEm","Entregue em","date"):""}</div>${campo("looks","Looks escolhidos","textarea","peças, tamanhos")}</div>`;
+  }
+  if(!novo && i>=4 && r.etapa!=="recusada"){
+    h+=`<div class="box ${r.etapa==="entregue"?"focus":""}"><h4>Vídeo de conteúdo</h4><div class="kv"><span>Prazo</span><span class="v">${fmtD(r.prazoVideo)}</span></div>${campo("videoLink","Link do vídeo publicado","url","https://instagram.com/…")}${r.videoLink?`<a href="${esc(r.videoLink)}" target="_blank" rel="noopener" class="note">Abrir vídeo ↗</a>`:""}${r.videoEnviadoPelaAfiliadaEm?`<p class="note">Enviado pela afiliada pelo site em ${new Date(r.videoEnviadoPelaAfiliadaEm).toLocaleDateString("pt-BR")}</p>`:""}</div>`;
+    if(r.etapa==="entregue"&&!r.videoLink) h+=blocoMsg(p&&p.cls==="bad"?"Cobrança do vídeo":"Aviso de prazo",p&&p.cls==="bad"?M.cobranca:M.entregue,W);
+  }
+  if(!novo && i>=5 && r.etapa!=="recusada"){
+    h+=`<div class="box ${r.etapa==="video"?"focus":""}"><h4>Cupom de afiliada e comissão</h4>
+    <div class="kv"><span>Cupom</span><span class="code">${esc(r.cupom?.codigo)}</span></div>
+    <div class="kv"><span>Desconto para clientes</span><span class="v">${r.cupom?.desconto}%</span></div>
+    <div class="kv"><span>Comissão da afiliada</span><span class="v">${r.cupom?.comissao}%</span></div><div class="kv"><span>Crédito look mensal</span><span class="v">${r.cupom?.creditoLook??cfg.creditoLook}%</span></div><div class="kv"><span>Meta mínima</span><span class="v">${brl(cfg.metaMensal)}/mês</span></div>
+    <ol class="how"><li>wBuy → Afiliados → cadastrar <b>${esc(r.nome)}</b> com comissão de <b>${r.cupom?.comissao}%</b></li><li>Criar o cupom <b>${esc(r.cupom?.codigo)}</b> com <b>${r.cupom?.desconto}%</b> de desconto, sem limite de uso</li><li>Vincular o cupom à afiliada, para a comissão contar nas vendas</li></ol>
+    <p class="note">Os nomes dos menus podem variar conforme a versão da sua wBuy.</p>
+    ${chk("cupom.afiliadaCadastrada","Afiliada cadastrada no módulo de afiliados da wBuy")}${chk("cupom.cadastradoWbuy","Cupom criado e vinculado à afiliada")}${chk("cupom.grupo","Adicionada ao grupo de afiliadas no WhatsApp")}</div>`;
+    if(r.etapa==="ativa"||r.etapa==="video")h+=blocoMsg("Mensagem do cupom ativo",M.ativa,W);
+  }
+  if(r.etapa==="recusada")h+=blocoMsg("Mensagem de resposta",M.recusada,W);
+  h+=`<div class="box">${campo("notas","Anotações internas","textarea")}${(r.historico||[]).length?`<div class="hist">${r.historico.slice().reverse().map(x=>`<span>${fmtD(x.em)} · ${esc(x.t)}</span>`).join("")}</div>`:""}</div>`;
+  const acoes={proposta:[["aprovar","Aprovar e gerar voucher","primary"],["recusar","Recusar","danger"]],aprovada:[["compra","Compra feita","primary"]],compra:[["enviado","Marcar looks enviados","primary"]],enviado:[["entregue","Confirmar entrega e iniciar prazo","primary"]],entregue:[["video","Vídeo conferido, gerar cupom","primary"]],video:[["ativa","Ativar afiliada","primary"]],ativa:[],recusada:[["reabrir","Reabrir inscrição",""]]};
+  h+=`<div class="btnrow">${novo?`<button class="primary" data-act="criar">Salvar afiliada</button>`:`${(acoes[r.etapa]||[]).map(a=>`<button class="${a[2]}" data-act="${a[0]}">${a[1]}</button>`).join("")}<button data-act="salvar">Salvar alterações</button>${i>0&&r.etapa!=="recusada"?`<button class="ghost small" data-act="voltar">Voltar etapa</button>`:""}<button class="ghost small danger" data-act="excluir">Excluir</button>`}</div><div id="confirmBox"></div>`;
+  const root=$("#drawerRoot");const sc=root.querySelector(".drawer")?.scrollTop||0;
+  root.innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Ficha da afiliada">${h}</aside>`;
+  root.querySelector(".drawer").scrollTop=sc;
+}
+function lerCampos(){
+  document.querySelectorAll("[data-f]").forEach(el=>{const ks=el.dataset.f.split(".");let o=draft;ks.slice(0,-1).forEach(k=>o=o[k]=o[k]||{});o[ks.at(-1)]=el.value.trim()});
+  document.querySelectorAll("[data-c]").forEach(el=>{const ks=el.dataset.c.split(".");let o=draft;ks.slice(0,-1).forEach(k=>o=o[k]=o[k]||{});o[ks.at(-1)]=el.checked});
+}
+function hist(t){draft.historico=[...(draft.historico||[]),{em:hoje(),t}]}
+async function salvar(msg){
+  try{const j=await api("PUT","/api/admin/afiliadas/"+encodeURIComponent(draft.id),draft);draft.protocolo=j.protocolo;
+    const k=rows.findIndex(x=>x.id===draft.id);const c=JSON.parse(JSON.stringify(draft));if(k>=0)rows[k]=c;else rows.unshift(c);
+    renderTop();renderList();toast(msg||"Salvo");return true}
+  catch(e){if(e.message!=="login")toast("Não foi possível salvar: "+e.message);return false}
+}
+async function acao(a){
+  lerCampos();const r=draft;
+  if(a==="criar"){if(!r.nome){toast("Informe o nome da afiliada");return}r.id="af"+Date.now().toString(36);r.etapa="proposta";r.origem="Cadastro manual no painel";r.criadoEm=new Date().toISOString();hist("Cadastrada no painel");aberta=r.id;if(await salvar("Afiliada cadastrada"))renderDrawer();return}
+  if(a==="aprovar"){r.voucher={codigo:codigoUnico("LOOK"+slug(r.nome),r.id),valor:cfg.voucherValor,validade:addDias(hoje(),cfg.validadeVoucherDias),cadastradoWbuy:false};r.prazoDias=cfg.prazoDias;r.etapa="aprovada";hist(`Aprovada · voucher ${r.voucher.codigo} de ${brl(r.voucher.valor)}`)}
+  if(a==="recusar"){r.etapa="recusada";hist("Inscrição recusada")}
+  if(a==="reabrir"){r.etapa="proposta";hist("Inscrição reaberta")}
+  if(a==="compra"){if(!r.voucher?.cadastradoWbuy){toast("Marque antes que o voucher foi cadastrado na wBuy");return}r.etapa="compra";hist("Looks comprados"+(r.pedido?` · pedido ${r.pedido}`:""))}
+  if(a==="enviado"){r.enviadoEm=r.enviadoEm||hoje();r.envioMetodo=r.envioMetodo||"Flora Entrega";r.etapa="enviado";hist(`Looks enviados por ${r.envioMetodo}`)}
+  if(a==="entregue"){r.entregueEm=r.entregueEm||hoje();r.prazoVideo=addDias(r.entregueEm,Number(r.prazoDias||cfg.prazoDias));r.etapa="entregue";hist(`Looks entregues · vídeo até ${fmtD(r.prazoVideo)}`)}
+  if(a==="video"){if(!r.videoLink){toast("Cole o link do vídeo publicado");return}r.videoEm=r.videoEm||hoje();r.cupom={codigo:codigoUnico(slug(r.nome)+cfg.desconto,r.id),desconto:cfg.desconto,comissao:cfg.comissao,creditoLook:cfg.creditoLook,cadastradoWbuy:false,afiliadaCadastrada:false,grupo:false};r.etapa="video";hist(`Vídeo conferido · cupom ${r.cupom.codigo}`)}
+  if(a==="ativa"){if(!r.cupom?.cadastradoWbuy||!r.cupom?.afiliadaCadastrada){toast("Marque os dois itens da wBuy antes de ativar");return}r.etapa="ativa";r.ativaEm=hoje();hist("Afiliada ativada")}
+  if(a==="voltar"){const ant=ETAPAS[Math.max(0,IDX[r.etapa]-1)].k;r.etapa=ant;hist("Voltou para: "+ETAPAS[IDX[ant]].l)}
+  if(a==="excluir"){$("#confirmBox").innerHTML=`<div class="alert">Excluir ${esc(r.nome)} de vez? <button class="small" data-act="excluirSim">Sim, excluir</button><button class="small" data-act="cancel">Cancelar</button></div>`;return}
+  if(a==="cancel"){$("#confirmBox").innerHTML="";return}
+  if(a==="excluirSim"){try{await api("DELETE","/api/admin/afiliadas/"+encodeURIComponent(r.id));rows=rows.filter(x=>x.id!==r.id);renderTop();renderList();toast("Excluída");fechar()}catch(e){toast("Não foi possível excluir")}return}
+  if(await salvar(a==="salvar"?"Alterações salvas":"Etapa atualizada"))renderDrawer();
+}
+function novaAfiliada(){aberta="__novo";draft={etapa:"proposta"};renderDrawer()}
+function abrirConfig(){
+  aberta="__config";draft=null;const n=(k,l,extra="")=>`<label class="f">${l}<input id="cfg-${k}" type="number" min="0" value="${esc(cfg[k])}" ${extra}></label>`;
+  $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Regras"><div class="dhead"><h2>Regras do programa</h2><button class="ghost small" id="fechar">Fechar</button></div>
+  <div class="box"><div class="grid2">${n("voucherValor","Valor do voucher (R$)")}${n("validadeVoucherDias","Validade do voucher (dias)")}${n("desconto","Desconto para clientes (%)")}${n("comissao","Comissão da afiliada (%)")}${n("prazoDias","Prazo do vídeo após entrega (dias)")}${n("minSeguidores","Mínimo de seguidores")}${n("creditoLook","Crédito look (%)")}${n("metaMensal","Meta mínima de vendas por mês (R$)")}
+  <label class="f">WhatsApp do marketing (aparece na página)<input id="cfg-whatsapp" value="${esc(cfg.whatsapp)}"></label></div>
+  <label class="check"><input type="checkbox" id="cfg-inscricoesAbertas" ${cfg.inscricoesAbertas?"checked":""}><span>Inscrições abertas na página pública</span></label>
+  <p class="note">Os valores aparecem na página pública e nas políticas. Afiliadas já aprovadas mantêm o que foi combinado.</p>
+  <div class="btnrow"><button class="primary" id="cfgSalvar">Salvar regras</button></div></div></aside>`;
+}
+async function salvarConfig(){
+  const n={};Object.keys(DEF).forEach(k=>{const el=$("#cfg-"+k);n[k]=el.type==="checkbox"?el.checked:el.type==="number"?Number(el.value):el.value});
+  try{cfg={...DEF,...await api("PUT","/api/admin/config",n)};renderTop();renderList();toast("Regras salvas");fechar()}catch(e){toast("Não foi possível salvar")}
+}
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("button");
+  if(e.target.id==="scrim"||t?.id==="fechar"){fechar();return}
+  if(!t)return;
+  if(t.classList.contains("stage")){filtro=filtro===t.dataset.k?null:t.dataset.k;renderTop();renderList();return}
+  if(t.dataset.filtro){filtro=t.dataset.k;renderTop();renderList();return}
+  if(t.classList.contains("card")){abrir(t.dataset.id);return}
+  if(t.dataset.act){acao(t.dataset.act);return}
+  if(t.hasAttribute("data-copy")){copiar(t.closest(".box").querySelector(".msg").textContent,t);return}
+  if(t.dataset.copylink){copiar(location.origin+"/",t);return}
+  if(t.id==="btnNova")novaAfiliada();
+  if(t.id==="btnConfig")abrirConfig();
+  if(t.id==="cfgSalvar")salvarConfig();
+  if(t.id==="btnSair"){await fetch("/api/logout",{method:"POST"});mostrarLogin()}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&aberta)fechar()});
+$("#busca").addEventListener("input",renderList);$("#ordem").addEventListener("change",renderList);
+carregar();
+setInterval(()=>{if(!aberta&&!document.hidden&&!$("#app").hidden)carregar()},60000);
+</script>
+
+</body></html>
