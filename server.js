@@ -24,12 +24,14 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 const EMAIL_FROM = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `Flora Amar <${process.env.SMTP_USER}>` : "");
 const DEFAULT_CONFIG = { voucherValor: 500, desconto: 5, comissao: 5, prazoDias: 15, validadeVoucherDias: 30, minSeguidores: 1000, creditoLook: 10, metaMensal: 500, whatsapp: "(11) 92040-3050", inscricoesAbertas: true,
   nivel1Ate: 10000, nivel1Comissao: 5, nivel1Bonus: 10, nivel2Ate: 20000, nivel2Comissao: 6, nivel2Bonus: 7, nivel3Comissao: 7, nivel3Bonus: 5,
-  autoFechamento: true, manterOuro: true };
+  autoFechamento: true };
 // níveis por conversão mensal (Bronze, Prata, Ouro)
-function nivelDe(total, c) {
-  if (total > c.nivel2Ate) return { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null };
-  if (total > c.nivel1Ate) return { nome: "Prata", comissao: c.nivel2Comissao, bonus: c.nivel2Bonus, proximo: { nome: "Ouro", falta: c.nivel2Ate - total } };
-  return { nome: "Bronze", comissao: c.nivel1Comissao, bonus: c.nivel1Bonus, proximo: { nome: "Prata", falta: c.nivel1Ate - total } };
+// limites mensais × 3 = limites do trimestre (ex.: R$ 10 mil/mês → R$ 30 mil no trimestre)
+function nivelDe(total, c, mult = 3) {
+  const a1 = c.nivel1Ate * mult, a2 = c.nivel2Ate * mult;
+  if (total > a2) return { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null };
+  if (total > a1) return { nome: "Prata", comissao: c.nivel2Comissao, bonus: c.nivel2Bonus, proximo: { nome: "Ouro", falta: Math.round((a2 - total) * 100) / 100 } };
+  return { nome: "Bronze", comissao: c.nivel1Comissao, bonus: c.nivel1Bonus, proximo: { nome: "Prata", falta: Math.round((a1 - total) * 100) / 100 } };
 }
 const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
 const STATUS_VALIDOS = new Set(["3", "4", "5", "7", "9", "12", "13", "14", "15", "16"]); // pagos/em andamento/concluídos
@@ -114,7 +116,7 @@ app.get("/healthz", (req, res) => res.send("ok"));
 
 app.get("/api/config-publica", async (req, res) => {
   const c = await store.getConfig();
-  res.json({ voucherValor: c.voucherValor, desconto: c.desconto, comissao: c.comissao, prazoDias: c.prazoDias, validadeVoucherDias: c.validadeVoucherDias, minSeguidores: c.minSeguidores, creditoLook: c.creditoLook, metaMensal: c.metaMensal, whatsapp: c.whatsapp, niveis: [{ nome: "Bronze", de: 0, ate: c.nivel1Ate, comissao: c.nivel1Comissao, bonus: c.nivel1Bonus }, { nome: "Prata", de: c.nivel1Ate, ate: c.nivel2Ate, comissao: c.nivel2Comissao, bonus: c.nivel2Bonus }, { nome: "Ouro", de: c.nivel2Ate, ate: null, comissao: c.nivel3Comissao, bonus: c.nivel3Bonus }], inscricoesAbertas: c.inscricoesAbertas });
+  res.json({ voucherValor: c.voucherValor, desconto: c.desconto, comissao: c.comissao, prazoDias: c.prazoDias, validadeVoucherDias: c.validadeVoucherDias, minSeguidores: c.minSeguidores, creditoLook: c.creditoLook, metaMensal: c.metaMensal, whatsapp: c.whatsapp, niveisTrimestrais: true, niveis: [{ nome: "Bronze", de: 0, ate: c.nivel1Ate * 3, comissao: c.nivel1Comissao, bonus: c.nivel1Bonus }, { nome: "Prata", de: c.nivel1Ate * 3, ate: c.nivel2Ate * 3, comissao: c.nivel2Comissao, bonus: c.nivel2Bonus }, { nome: "Ouro", de: c.nivel2Ate * 3, ate: null, comissao: c.nivel3Comissao, bonus: c.nivel3Bonus }], inscricoesAbertas: c.inscricoesAbertas });
 });
 
 app.post("/api/inscricao", limite(8, 60 * 60e3), async (req, res) => {
@@ -150,7 +152,7 @@ function viewPublica(r, c) {
   if (r.etapa === "aprovada") { v.cadastroPendente = !r.dadosWbuy; v.linkCadastro = `/cadastro?p=${r.protocolo}&t=${tokenCadastro(r.protocolo)}`; }
   if (["enviado"].includes(r.etapa)) v.envio = { metodo: r.envioMetodo, rastreio: r.rastreio };
   if (r.etapa === "entregue") { v.prazoVideo = r.prazoVideo; v.videoLink = r.videoLink || ""; }
-  if (r.etapa === "ativa") { const rs = resumoMes(r, mesAtual(), c); v.mes = { nome: nomeMes(mesAtual()), total: rs.total, qtd: rs.qtd, nivel: rs.nivel, mantido: rs.mantido, bonusPct: rs.bonusPct, comissaoPct: rs.comissaoPct, bonusValor: rs.bonusValor, proximo: rs.proximo }; const fa = r.fechamentos?.[mesAnterior()]; if (fa) v.mesAnterior = { nome: nomeMes(mesAnterior()), total: fa.total, nivel: fa.nivel, bonusValor: fa.bonusValor, lancado: !!fa.creditoLancado }; }
+  if (r.etapa === "ativa") { const rs = resumoMes(r, mesAtual(), c); v.mes = { nome: nomeMes(mesAtual()), total: rs.total, qtd: rs.qtd, nivel: rs.nivel, mantido: rs.mantido, trimestre: rs.trimestre, bonusPct: rs.bonusPct, comissaoPct: rs.comissaoPct, bonusValor: rs.bonusValor, proximo: rs.proximo }; const fa = r.fechamentos?.[mesAnterior()]; if (fa) v.mesAnterior = { nome: nomeMes(mesAnterior()), total: fa.total, nivel: fa.nivel, bonusValor: fa.bonusValor, lancado: !!fa.creditoLancado }; }
   if (r.etapa === "ativa" && r.cupom) v.cupom = { codigo: r.cupom.codigo, desconto: r.cupom.desconto, comissao: r.cupom.comissao, creditoLook: r.cupom.creditoLook ?? c.creditoLook };
   return v;
 }
@@ -349,19 +351,51 @@ async function sincronizarVendas(mes) {
   return { mes, lidos, achados };
 }
 function vendaConta(v) { if (v.statusId) return !STATUS_INVALIDOS.has(String(v.statusId)); return !/cancel|devolv|estorn|recus|negad|aguard|análise|analise/i.test(v.status || ""); }
+/* ---- data de entrada e trimestres de cada afiliada ---- */
+const idxMes = m => { const [a, b] = String(m).split("-").map(Number); return a * 12 + b - 1; };
+const mesIdx = i => `${Math.floor(i / 12)}-${String(i % 12 + 1).padStart(2, "0")}`;
+const ehImportada = r => String(r.origem || "").startsWith("Importada");
+const dataOk = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || "")) ? String(d) : "";
+function primeiraVenda(r) { const ds = Object.values(r.vendas || {}).filter(vendaConta).map(v => String(v.em || "").slice(0, 10)).filter(dataOk).sort(); return ds[0] || ""; }
+// data em que a afiliada entrou: a informada pelo time; senão a ativação (cadastro pelo site) ou a 1ª venda com o cupom (importadas)
+function entradaDe(r) {
+  if (dataOk(r.dataEntrada)) return { data: r.dataEntrada, fonte: "informada" };
+  if (!ehImportada(r)) { const d = dataOk(String(r.ativaEm || "").slice(0, 10)); if (d) return { data: d, fonte: "ativação" }; return { data: "", fonte: "" }; }
+  const p = primeiraVenda(r); return p ? { data: p, fonte: "1ª venda com o cupom" } : { data: "", fonte: "" };
+}
+function totalDoMes(r, mes) {
+  const vs = Object.values(r.vendas || {}).filter(v => String(v.em || "").slice(0, 7) === mes && vendaConta(v));
+  let t = r2(vs.reduce((a, v) => a + (Number(v.total) || 0), 0));
+  if (!vs.length && r.fechamentos?.[mes]?.total) t = r.fechamentos[mes].total;
+  return t;
+}
+const nomeMesCurto = m => { const [a, b] = m.split("-").map(Number); return ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][b - 1] + "/" + String(a).slice(2); };
+const nomePeriodo = ms => `${nomeMesCurto(ms[0])} a ${nomeMesCurto(ms[ms.length - 1])}`;
+// trimestres contados a partir do mês de entrada; o nível de um trimestre vem da soma das vendas do trimestre anterior
+function trimestreDe(r, mes) {
+  const e = entradaDe(r); if (!e.data) return null;
+  const k = Math.floor((idxMes(mes) - idxMes(e.data.slice(0, 7))) / 3); if (k < 0) return null;
+  const i0 = idxMes(e.data.slice(0, 7)) + 3 * k;
+  const meses = [0, 1, 2].map(x => mesIdx(i0 + x)); const anteriores = k > 0 ? [-3, -2, -1].map(x => mesIdx(i0 + x)) : [];
+  return { n: k + 1, meses, anteriores, entrada: e.data, fonte: e.fonte };
+}
 function resumoMes(r, mes, c) {
   const vs = Object.entries(r.vendas || {}).map(([id, v]) => ({ id, ...v })).filter(v => String(v.em || "").slice(0, 7) === mes);
   const validas = vs.filter(vendaConta);
   const total = r2(validas.reduce((a, v) => a + (Number(v.total) || 0), 0));
-  let nv = nivelDe(total, c), mantido = "";
-  // quem foi Ouro pelas próprias vendas no mês anterior continua Ouro neste mês
-  if (c.manterOuro && nv.nome !== "Ouro") {
-    const ant = mesAnterior(mes);
-    let totAnt = r2(Object.values(r.vendas || {}).filter(v => String(v.em || "").slice(0, 7) === ant && vendaConta(v)).reduce((a, v) => a + (Number(v.total) || 0), 0));
-    if (!totAnt && r.fechamentos?.[ant]?.total) totAnt = r.fechamentos[ant].total;
-    if (nivelDe(totAnt, c).nome === "Ouro") { nv = { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null }; mantido = nomeMes(ant); }
+  const tri = trimestreDe(r, mes);
+  let base = 0, nv = nivelDe(0, c), trimestre = null, proximo = null, mantido = "";
+  if (tri) {
+    base = r2(tri.anteriores.reduce((a, m) => a + totalDoMes(r, m), 0));
+    nv = nivelDe(base, c);
+    const acumulado = r2(tri.meses.filter(m => m <= mes).reduce((a, m) => a + (m === mes ? total : totalDoMes(r, m)), 0));
+    const proj = nivelDe(acumulado, c);
+    proximo = proj.proximo;
+    trimestre = { n: tri.n, periodo: nomePeriodo(tri.meses), meses: tri.meses, entrada: tri.entrada, fonte: tri.fonte,
+      base, periodoAnterior: tri.anteriores.length ? nomePeriodo(tri.anteriores) : "", acumulado, nivelProximoTrimestre: proj.nome };
+    mantido = tri.anteriores.length ? `vendas de ${nomePeriodo(tri.anteriores)}` : "1º trimestre";
   }
-  return { total, mantido, qtd: validas.length, pendentes: vs.length - validas.length, nivel: nv.nome, comissaoPct: nv.comissao, bonusPct: nv.bonus, comissaoValor: r2(total * nv.comissao / 100), bonusValor: r2(total * nv.bonus / 100), proximo: nv.proximo, metaOk: total >= c.metaMensal, vendas: vs.sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 50) };
+  return { total, mantido, trimestre, qtd: validas.length, pendentes: vs.length - validas.length, nivel: nv.nome, comissaoPct: nv.comissao, bonusPct: nv.bonus, comissaoValor: r2(total * nv.comissao / 100), bonusValor: r2(total * nv.bonus / 100), proximo, metaOk: total >= c.metaMensal, vendas: vs.sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 50) };
 }
 async function acharClienteWbuy(r) {
   const emails = [r.dadosWbuy?.emailLoja, r.dadosWbuy?.email, r.email].filter(Boolean).map(e => e.toLowerCase());
@@ -387,7 +421,7 @@ async function fecharMes(mes, lancar) {
       const rs = resumoMes(r, mes, c);
       r.fechamentos = r.fechamentos || {};
       const ant = r.fechamentos[mes] || {};
-      const f = { ...ant, mes, total: rs.total, qtd: rs.qtd, nivel: rs.nivel, nivelMantido: rs.mantido, comissaoPct: rs.comissaoPct, comissaoValor: rs.comissaoValor, bonusPct: rs.bonusPct, bonusValor: rs.bonusValor, metaOk: rs.metaOk, calculadoEm: new Date().toISOString() };
+      const f = { ...ant, mes, total: rs.total, qtd: rs.qtd, nivel: rs.nivel, nivelMantido: rs.mantido, trimestre: rs.trimestre ? { n: rs.trimestre.n, periodo: rs.trimestre.periodo, base: rs.trimestre.base } : null, comissaoPct: rs.comissaoPct, comissaoValor: rs.comissaoValor, bonusPct: rs.bonusPct, bonusValor: rs.bonusValor, metaOk: rs.metaOk, calculadoEm: new Date().toISOString() };
       if (ant.creditoLancado) { f.bonusValor = ant.bonusValor; f.total = ant.total; f.nivel = ant.nivel; f.bonusPct = ant.bonusPct; }
       if (lancar && !ant.creditoLancado && f.bonusValor > 0) {
         try {
@@ -423,7 +457,7 @@ setInterval(async () => {
       try { await fecharMes(ant, true); } catch (e) { console.error("fechamento", e.message); }
       const c3 = await store.getConfig(); c3.__fechamentos = c3.__fechamentos || {}; c3.__fechamentos[ant] = { ...(c3.__fechamentos[ant] || {}), tentativas: (c3.__fechamentos[ant]?.tentativas || 0) + 1 }; await store.setConfig(c3);
     }
-    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); for (const m of ultimos3Meses()) if (!c.__sync?.[m]) { await sincronizarVendas(m); await espera(2000); } await sincronizarVendas(mesAtual()); }
+    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); for (const m of ultimosMeses(6)) if (!c.__sync?.[m]) { await sincronizarVendas(m); await espera(2000); } await sincronizarVendas(mesAtual()); }
   } catch (e) { console.error("agenda", e.message); }
 }, 20 * 60e3);
 
@@ -437,7 +471,11 @@ app.post("/api/login", limite(10, 15 * 60e3), (req, res) => {
   res.json({ ok: true });
 });
 app.post("/api/logout", (req, res) => { res.setHeader("Set-Cookie", "fa_sess=; Path=/; Max-Age=0"); res.json({ ok: true }); });
-app.get("/api/admin/afiliadas", exigeAdmin, async (req, res) => res.json((await store.list()).map(r => ({ ...r, tokenCadastro: r.protocolo ? tokenCadastro(r.protocolo) : "" }))));
+app.get("/api/admin/afiliadas", exigeAdmin, async (req, res) => {
+  const c = await store.getConfig();
+  res.json((await store.list()).map(r => { const rs = r.etapa === "ativa" ? resumoMes(r, mesAtual(), c) : null; if (rs) delete rs.vendas;
+    return { ...r, tokenCadastro: r.protocolo ? tokenCadastro(r.protocolo) : "", entrada: entradaDe(r), resumo: rs }; }));
+});
 app.post("/api/admin/email", exigeAdmin, limite(60, 60 * 60e3), async (req, res) => {
   if (!mailer) return res.status(400).json({ erro: "Envio automático de e-mail não configurado." });
   const { para, assunto, texto } = req.body || {};
@@ -447,7 +485,7 @@ app.post("/api/admin/email", exigeAdmin, limite(60, 60 * 60e3), async (req, res)
 });
 app.put("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => {
   const id = String(req.params.id).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60);
-  const data = req.body || {}; delete data.tokenCadastro; data.atualizadoEm = new Date().toISOString();
+  const data = req.body || {}; delete data.tokenCadastro; delete data.entrada; delete data.resumo; if (data.dataEntrada && !dataOk(data.dataEntrada)) delete data.dataEntrada; data.atualizadoEm = new Date().toISOString();
   if (!data.protocolo) data.protocolo = novoProtocolo();
   await store.put(id, data); res.json({ ok: true, id, protocolo: data.protocolo });
 });
@@ -484,12 +522,14 @@ app.post("/api/admin/fechamento/desfazer", exigeAdmin, async (req, res) => {
   } catch (e) { res.status(400).json({ erro: e.message }); }
 });
 /* ---- aviso: afiliadas que não bateram a meta nos últimos 3 meses fechados ---- */
+function ultimosMeses(n) { const out = []; let m = mesAtual(); for (let i = 0; i < n; i++) { m = mesAnterior(m); out.unshift(m); } return out; }
 function ultimos3Meses() { const m1 = mesAnterior(); const m2 = mesAnterior(m1); const m3 = mesAnterior(m2); return [m3, m2, m1]; }
 function alertasMeta(todas, c) {
   const meses = ultimos3Meses();
   return todas.filter(r => r.etapa === "ativa").map(r => {
-    const inicio = String(r.origem || "").startsWith("Importada") ? "0000-00" : String(r.ativaEm || r.criadoEm || "9999").slice(0, 7);
-    if (inicio > meses[0]) return null; // ainda não completou 3 meses no programa
+    const e = entradaDe(r).data; if (!e) return null; // sem data de entrada: não avisa
+    const primeiroMesCheio = e.slice(8, 10) === "01" ? e.slice(0, 7) : mesIdx(idxMes(e.slice(0, 7)) + 1);
+    if (primeiroMesCheio > meses[0]) return null; // ainda não completou 3 meses cheios no programa
     if (r.avisoMetaIgnorado === meses[2]) return null; // time decidiu manter neste ciclo
     const m = meses.map(mes => ({ mes, nome: nomeMes(mes), total: resumoMes(r, mes, c).total }));
     if (m.some(x => x.total >= c.metaMensal)) return null;
@@ -524,7 +564,7 @@ app.get("/api/admin/importar/wbuy", exigeAdmin, async (req, res) => {
       const seus = cupons.filter(c => String(c.afiliado_id ?? c.vendedor_id ?? "") === id && id).map(c => String(c.cupom || "").toUpperCase().trim()).filter(Boolean);
       const todosCods = [...new Set([codigo, ...seus].filter(Boolean))];
       const email = String(v.email || "").toLowerCase().trim();
-      return { wbuyId: id, nome: limpa(v.nome, 120), email, codigo, cupons: todosCods, comissao: v.comissao ?? "", ativo: String(v.ativo ?? "1") !== "0", jaExiste: (email && emails.has(email)) || todosCods.some(c => cods.has(c)) };
+      return { wbuyId: id, nome: limpa(v.nome, 120), email, codigo, cupons: todosCods, comissao: v.comissao ?? "", dataEntrada: String(v.data_cadastro || v.dt_cadastro || v.data_criacao || v.created_at || v.data || "").slice(0, 10).match(/^\d{4}-\d{2}-\d{2}$/)?.[0] || "", ativo: String(v.ativo ?? "1") !== "0", jaExiste: (email && emails.has(email)) || todosCods.some(c => cods.has(c)) };
     });
     res.json({ total: lista.length, lista });
   } catch (e) { res.status(400).json({ erro: e.message }); }
@@ -545,7 +585,7 @@ app.post("/api/admin/importar", exigeAdmin, async (req, res) => {
       nome, email, instagram: limpa(it.instagram, 120), whatsapp: limpa(it.whatsapp, 30), protocolo: novoProtocolo(), etapa: "ativa",
       origem: it.wbuyId ? "Importada da wBuy" : "Importada de lista", wbuyVendedorId: limpa(it.wbuyId, 20) || undefined,
       cupom: codigos[0] ? { codigo: codigos[0], desconto: c.desconto, comissao: Number(it.comissao) || c.nivel1Comissao, cadastradoWbuy: true, afiliadaCadastrada: true, grupo: true } : undefined,
-      codigosWbuy: codigos.slice(1), criadoEm: new Date().toISOString(), ativaEm: hoje(),
+      codigosWbuy: codigos.slice(1), criadoEm: new Date().toISOString(), ativaEm: hoje(), dataEntrada: dataOk(it.dataEntrada) || undefined,
       historico: [{ em: hoje(), t: it.wbuyId ? "Afiliada importada da wBuy (já ativa)" : "Afiliada importada de lista (já ativa)" }],
     });
     if (email) emails.add(email); codigos.forEach(x => cods.add(x)); criadas++;
