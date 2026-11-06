@@ -41,7 +41,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .terms{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
 .terms b{color:var(--fg);font-variant-numeric:tabular-nums}
 .alert{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--bad-soft);color:var(--bad);border-radius:var(--r);padding:10px 14px;font-weight:600}
-.funnel{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;overflow-x:auto}
+.funnel{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;overflow-x:auto}
 .stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 10px 9px;text-align:left;min-width:0;display:flex;flex-direction:column;gap:2px;border-radius:var(--r)}
 .stage .n{font-family:var(--display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
 .stage .l{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.25}
@@ -160,13 +160,15 @@ const ETAPAS=[
   {k:"entregue",l:"Aguardando vídeo",s:"5",next:"Aguardar o link do vídeo"},
   {k:"video",l:"Vídeo recebido",s:"6",next:"Criar cupom e comissão na wBuy"},
   {k:"ativa",l:"Afiliada ativa",s:"7",next:"Acompanhar vendas"},
-  {k:"recusada",l:"Recusadas",s:"–",next:""}
+  {k:"recusada",l:"Recusadas",s:"–",next:""},
+  {k:"encerrada",l:"Parceria encerrada",s:"–",next:""}
 ];
 const IDX=Object.fromEntries(ETAPAS.map((e,i)=>[e.k,i]));
 const DEF={voucherValor:500,desconto:5,comissao:5,prazoDias:15,validadeVoucherDias:30,minSeguidores:1000,creditoLook:10,metaMensal:500,whatsapp:"(11) 92040-3050",inscricoesAbertas:true,nivel1Ate:10000,nivel1Comissao:5,nivel1Bonus:10,nivel2Ate:20000,nivel2Comissao:6,nivel2Bonus:7,nivel3Comissao:7,nivel3Bonus:5,autoFechamento:true,manterOuro:true};
 function nivelDe(t){if(t>cfg.nivel2Ate)return{nome:"Ouro",comissao:cfg.nivel3Comissao,bonus:cfg.nivel3Bonus,proximo:null};if(t>cfg.nivel1Ate)return{nome:"Prata",comissao:cfg.nivel2Comissao,bonus:cfg.nivel2Bonus,proximo:{nome:"Ouro",falta:cfg.nivel2Ate-t}};return{nome:"Bronze",comissao:cfg.nivel1Comissao,bonus:cfg.nivel1Bonus,proximo:{nome:"Prata",falta:cfg.nivel1Ate-t}}}
 const INVALIDOS=new Set(["1","2","6","8","10","11"]);
 const vendaConta=v=>v.statusId?!INVALIDOS.has(String(v.statusId)):!/cancel|devolv|estorn|recus|negad|aguard|análise|analise/i.test(v.status||"");
+let alertas={lista:[],meses:[]};
 let cfg={...DEF}, rows=[], filtro=null, aberta=null, draft=null;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -185,7 +187,7 @@ function codigoUnico(base,id){const usados=new Set(rows.filter(r=>r.id!==id).fla
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:b?{"Content-Type":"application/json"}:{},body:b?JSON.stringify(b):undefined});
   if(r.status===401){mostrarLogin();throw new Error("login")}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.erro||"Erro");return j}
 async function carregar(){
-  try{const [l,c]=await Promise.all([api("GET","/api/admin/afiliadas"),api("GET","/api/admin/config")]);rows=l;cfg={...DEF,...c};
+  try{const [l,c,al]=await Promise.all([api("GET","/api/admin/afiliadas"),api("GET","/api/admin/config"),api("GET","/api/admin/alertas-meta").catch(()=>({lista:[],meses:[]}))]);rows=l;cfg={...DEF,...c};alertas=al;
     $("#login").hidden=true;$("#app").hidden=false;$("#status").hidden=true;renderTop();renderList();}
   catch(e){if(e.message!=="login"){$("#status").hidden=false;$("#status").textContent="Não foi possível carregar. Verifique a conexão."}}
 }
@@ -212,6 +214,10 @@ function renderTop(){
   if(atras.length)h+=`<div class="alert">${atras.length} vídeo${atras.length>1?"s":""} atrasado${atras.length>1?"s":""}: ${atras.map(r=>esc(primeiroNome(r.nome))).join(", ")} <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
   if(conferir.length)h+=`<div class="alert" style="background:var(--ok-soft);color:var(--ok);margin-top:8px">${conferir.length} vídeo${conferir.length>1?"s":""} enviado${conferir.length>1?"s":""} pelas afiliadas para conferir <button class="small" data-k="entregue" data-filtro="1">Ver</button></div>`;
   if(usouVoucher.length)h+=`<div class="alert" style="background:var(--warn-soft);color:var(--warn);margin-top:8px">${usouVoucher.length===1?esc(primeiroNome(usouVoucher[0].nome))+" usou o voucher"+(usouVoucher[0].voucher.pedidoUso?" no pedido "+esc(usouVoucher[0].voucher.pedidoUso):""):usouVoucher.length+" afiliadas usaram o voucher"}: separar e enviar os looks <button class="small" data-k="compra" data-filtro="1">Ver</button></div>`;
+  if(alertas.lista?.length){const ms=alertas.meses.map(m=>m.nome.split("/")[0]).join(", ");
+    h=`<div class="alert" style="flex-direction:column;align-items:flex-start;gap:6px"><div>Excluir do programa: ${alertas.lista.length} afiliada${alertas.lista.length>1?"s":""} não bateu${alertas.lista.length>1?"ram":""} a meta de ${brl(cfg.metaMensal)} em nenhum dos últimos 3 meses (${esc(ms)})</div>
+    <div style="display:flex;flex-direction:column;gap:4px;font-weight:500">${alertas.lista.map(a=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(a.nome)}</b>${a.cupom?` <span class="code">${esc(a.cupom)}</span>`:""}<span>${a.meses.map(m=>brl(m.total)).join(" · ")}</span><button class="small" data-abrir="${esc(a.id)}">Abrir ficha</button></div>`).join("")}</div>
+    ${alertas.meses.some(m=>!m.sincronizado)&&cfg.wbuyApi?`<div class="note" style="color:inherit">Alguns desses meses ainda não foram buscados na wBuy. Atualize as vendas na aba “Vendas e Bônus Look” para confirmar.</div>`:""}</div>`+h}
   ab.hidden=!h;ab.innerHTML=h;
 }
 function renderList(){
@@ -225,7 +231,7 @@ function renderList(){
   st.hidden=!(filtro||q);st.textContent=`${l.length} afiliada${l.length!==1?"s":""} ${filtro?"em “"+ETAPAS[IDX[filtro]].l+"”":""}`;
   $("#list").innerHTML=l.length?l.map(r=>{
     const e=ETAPAS[IDX[r.etapa]]||ETAPAS[0];const p=prazoInfo(r);
-    const pcls=r.etapa==="ativa"?"ok":r.etapa==="recusada"?"":"a";
+    const pcls=alertas.lista?.some(a=>a.id===r.id)?"bad":r.etapa==="ativa"?"ok":["recusada","encerrada"].includes(r.etapa)?"":"a";
     return `<button class="card" data-id="${esc(r.id)}"><div class="row"><div style="min-width:0"><h3>${esc(r.nome||"Sem nome")}</h3><div class="ig">${esc(r.instagram||"")}${r.seguidores?" · "+Number(r.seguidores).toLocaleString("pt-BR")+" seguidores":""}</div></div><span class="pill ${pcls}">${esc(e.l)}</span></div>
     ${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}${r.etapa==="compra"&&r.voucher?.usado?`<span class="pill warn" style="align-self:flex-start">Voucher usado${r.voucher.pedidoUso?" · pedido "+esc(r.voucher.pedidoUso):""}</span>`:""}${r.etapa==="ativa"?`<span class="pill ok" style="align-self:flex-start">${resumoVendas(r).txt}</span>`:""}${r.etapa==="aprovada"?`<span class="pill ${r.dadosWbuy?"ok":"warn"}" style="align-self:flex-start">${r.dadosWbuy?"Dados recebidos: cadastrar na wBuy":"Aguardando dados da afiliada"}</span>`:""}
     <div class="codes"><span class="code">${esc(r.protocolo||"")}</span>${r.voucher?.codigo?`<span class="code">${esc(r.voucher.codigo)}</span>`:""}${(r.cupom?.codigo||r.dadosWbuy?.cupom)?`<span class="code">${esc(r.cupom?.codigo||r.dadosWbuy.cupom)}</span>`:""}</div>
@@ -246,6 +252,7 @@ function msgs(r){
     entregue:`Oi, ${n}! Seus looks Flora Amar chegaram 💐\n\nO conteúdo de recebidos vai até ${fmtD(r.prazoVideo)}. Quando postar, envie o link em ${site}/#acompanhar (protocolo ${r.protocolo||""}) para liberarmos seu cupom de afiliada. 😊`,
     cobranca:`Oi, ${n}! Tudo bem? Passando para lembrar do vídeo com os looks Flora Amar, o prazo era ${fmtD(r.prazoVideo)}. Consegue postar nos próximos dias? Assim já libero seu cupom de afiliada com comissão. 💕`,
     ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe comissão em dinheiro + Bônus Look todo mês sobre as vendas com ele, conforme o seu nível: Bronze (até ${brl(cfg.nivel1Ate)}/mês) ${cfg.nivel1Comissao}% + ${cfg.nivel1Bonus}% · Prata (até ${brl(cfg.nivel2Ate)}) ${cfg.nivel2Comissao}% + ${cfg.nivel2Bonus}% · Ouro (acima de ${brl(cfg.nivel2Ate)}) ${cfg.nivel3Comissao}% + ${cfg.nivel3Bonus}%. O Bônus Look entra como crédito na sua conta da loja todo dia 01.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
+    encerrada:`Oi, ${n}! Tudo bem? 🌸\n\nQueremos agradecer muito por ter feito parte do Programa de Afiliadas Flora Amar. Como a meta mínima de ${brl(cfg.metaMensal)} em vendas por mês não foi atingida nos últimos 3 meses, conforme o regulamento, a parceria está sendo encerrada e o seu cupom será desativado.\n\nO carinho continua, e as portas seguem abertas para uma nova inscrição no futuro. 💕`,
     recusada:`Oi, ${n}! Obrigada pelo interesse no programa de afiliadas Flora Amar 🌸 Desta vez seu perfil não se encaixou no que buscamos, mas seguimos juntas por lá!`
   };
 }
@@ -272,7 +279,7 @@ function blocoDados(r){
 function blocoMsg(titulo,texto,whats){return `<div class="box"><div class="kv"><h4>${titulo}</h4><div class="btnrow"><button class="small" data-copy>Copiar</button>${whats?`<a class="btn small" style="text-decoration:none;padding:5px 12px;font-size:12.5px" target="_blank" rel="noopener" href="https://wa.me/${waNum(whats)}?text=${encodeURIComponent(texto)}">Enviar no WhatsApp</a>`:""}</div></div><div class="msg">${esc(texto)}</div></div>`}
 function renderDrawer(){
   const r=draft;if(!r)return;const novo=!r.id;const i=IDX[r.etapa||"proposta"];const M=msgs(r);const p=prazoInfo(r);const W=r.whatsapp;
-  const passos=ETAPAS.slice(0,7).map((e,j)=>`<span class="${r.etapa!=="recusada"&&j<=i?"done":""}" title="${e.l}"></span>`).join("");
+  const passos=ETAPAS.slice(0,7).map((e,j)=>`<span class="${!["recusada","encerrada"].includes(r.etapa)&&j<=i?"done":""}" title="${e.l}"></span>`).join("");
   let h=`<div class="dhead"><div style="min-width:0"><span class="pill ${r.etapa==="ativa"?"ok":"a"}">${novo?"Nova afiliada":esc(ETAPAS[i].l)}</span>${r.protocolo?` <span class="code">${esc(r.protocolo)}</span>`:""}<h2>${esc(r.nome||"Nova afiliada")}</h2></div><button class="ghost small" id="fechar" aria-label="Fechar">Fechar</button></div>
   ${novo?"":`<div class="steps">${passos}</div>`}${p?`<span class="pill ${p.cls}" style="align-self:flex-start">${p.t}</span>`:""}`;
   const igUrl=r.instagram?("https://instagram.com/"+String(r.instagram).replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//,"")):"";
@@ -318,6 +325,9 @@ function renderDrawer(){
     if(r.etapa==="ativa"||r.etapa==="video"){h+=blocoEmail("E-mail do cupom ativo","Seu cupom de afiliada Flora Amar está ativo ✨",M.ativa,r.dadosWbuy?.email||r.email);h+=blocoMsg("Mensagem do cupom ativo (WhatsApp)",M.ativa,W);}
   }
   if(r.etapa==="recusada")h+=blocoMsg("Mensagem de resposta",M.recusada,W);
+  const al=alertas.lista?.find(a=>a.id===r.id);
+  if(al&&r.etapa==="ativa")h+=`<div class="box" style="border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)"><div class="kv"><h4 style="color:var(--bad)">Meta não atingida nos últimos 3 meses</h4><span class="pill bad">Excluir do programa</span></div>${al.meses.map(m=>`<div class="kv"><span>${esc(m.nome)}</span><span class="v">${brl(m.total)} <span class="note">/ meta ${brl(cfg.metaMensal)}</span></span></div>`).join("")}<p class="note" style="margin:0">Pelo regulamento, a parceria é encerrada quando a meta mínima não é atingida de forma recorrente.</p><div class="btnrow"><button class="danger" data-act="encerrar">Encerrar parceria</button><button class="ghost small" data-act="manterMeta">Manter por mais um mês</button></div></div>`;
+  if(r.etapa==="encerrada"){h+=`<div class="box"><h4>Depois de encerrar</h4><ol class="how"><li>wBuy → Afiliados: desative ${esc(r.nome)}</li><li>Desative o cupom <b>${esc(r.cupom?.codigo||"")}</b> em Cupons de desconto</li><li>Remova do grupo de afiliadas no WhatsApp</li></ol></div>`;h+=blocoMsg("Mensagem de encerramento",M.encerrada,W);}
   if(!novo&&r.etapa!=="recusada"&&i>=1){
     const outras=[];
     if(r.etapa!=="aprovada"){outras.push(["E-mail de aprovação",blocoEmail("E-mail de aprovação","Você foi aprovada no Programa de Afiliadas Flora Amar 🌸",M.aprovadaEmail,r.email)]);outras.push(["Aprovação (WhatsApp)",blocoMsg("Mensagem de aprovação (WhatsApp)",M.aprovada,W)]);}
@@ -325,7 +335,7 @@ function renderDrawer(){
     if(outras.length)h+=`<details class="box"><summary style="cursor:pointer;font-weight:700">Outras mensagens para a afiliada (${outras.length})</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">${outras.map(o=>o[1]).join("")}</div></details>`;
   }
   h+=`<div class="box">${campo("notas","Anotações internas","textarea")}${(r.historico||[]).length?`<div class="hist">${r.historico.slice().reverse().map(x=>`<span>${fmtD(x.em)} · ${esc(x.t)}</span>`).join("")}</div>`:""}</div>`;
-  const acoes={proposta:[["aprovar","Aprovar e gerar voucher","primary"],["recusar","Recusar","danger"]],aprovada:[["compra","Compra feita","primary"]],compra:[["enviado","Marcar looks enviados","primary"]],enviado:[["entregue","Confirmar entrega e iniciar prazo","primary"]],entregue:[["video","Vídeo conferido, gerar cupom","primary"]],video:[["ativa","Ativar afiliada","primary"]],ativa:[],recusada:[["reabrir","Reabrir inscrição",""]]};
+  const acoes={proposta:[["aprovar","Aprovar e gerar voucher","primary"],["recusar","Recusar","danger"]],aprovada:[["compra","Compra feita","primary"]],compra:[["enviado","Marcar looks enviados","primary"]],enviado:[["entregue","Confirmar entrega e iniciar prazo","primary"]],entregue:[["video","Vídeo conferido, gerar cupom","primary"]],video:[["ativa","Ativar afiliada","primary"]],ativa:[],recusada:[["reabrir","Reabrir inscrição",""]],encerrada:[["reativar","Reativar parceria",""]]};
   h+=`<div class="btnrow">${novo?`<button class="primary" data-act="criar">Salvar afiliada</button>`:`${(acoes[r.etapa]||[]).map(a=>`<button class="${a[2]}" data-act="${a[0]}">${a[1]}</button>`).join("")}<button data-act="salvar">Salvar alterações</button>${i>0&&r.etapa!=="recusada"?`<button class="ghost small" data-act="voltar">Voltar etapa</button>`:""}<button class="ghost small danger" data-act="excluir">Excluir</button>`}</div><div id="confirmBox"></div>`;
   const root=$("#drawerRoot");const sc=root.querySelector(".drawer")?.scrollTop||0;
   root.innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Ficha da afiliada">${h}</aside>`;
@@ -349,6 +359,9 @@ async function acao(a){
   if(a==="aprovar"){r.voucher={codigo:codigoUnico("LOOK"+slug(r.nome),r.id),valor:cfg.voucherValor,validade:addDias(hoje(),cfg.validadeVoucherDias),cadastradoWbuy:false};r.prazoDias=cfg.prazoDias;r.etapa="aprovada";hist(`Aprovada · voucher ${r.voucher.codigo} de ${brl(r.voucher.valor)}`)}
   if(a==="recusar"){r.etapa="recusada";hist("Inscrição recusada")}
   if(a==="reabrir"){r.etapa="proposta";hist("Inscrição reaberta")}
+  if(a==="encerrar"){const al=alertas.lista?.find(x=>x.id===r.id);r.etapa="encerrada";r.encerradaEm=hoje();hist("Parceria encerrada: meta não atingida nos últimos 3 meses"+(al?" ("+al.meses.map(m=>m.nome+" "+brl(m.total)).join(", ")+")":""));alertas.lista=(alertas.lista||[]).filter(x=>x.id!==r.id)}
+  if(a==="manterMeta"){r.avisoMetaIgnorado=alertas.meses?.[2]?.mes||"";hist("Time decidiu manter a afiliada apesar da meta");alertas.lista=(alertas.lista||[]).filter(x=>x.id!==r.id)}
+  if(a==="reativar"){r.etapa="ativa";hist("Parceria reativada")}
   if(a==="compra"){if(!r.voucher?.cadastradoWbuy){toast("Marque antes que o voucher foi cadastrado na wBuy");return}r.etapa="compra";hist("Looks comprados"+(r.pedido?` · pedido ${r.pedido}`:""))}
   if(a==="enviado"){r.enviadoEm=r.enviadoEm||hoje();r.envioMetodo=r.envioMetodo||"Flora Entrega";r.etapa="enviado";hist(`Looks enviados por ${r.envioMetodo}`)}
   if(a==="entregue"){r.entregueEm=r.entregueEm||hoje();r.prazoVideo=addDias(r.entregueEm,Number(r.prazoDias||cfg.prazoDias));r.etapa="entregue";hist(`Looks entregues · vídeo até ${fmtD(r.prazoVideo)}`)}
@@ -463,6 +476,7 @@ document.addEventListener("click",async e=>{
   if(t.dataset.mail){enviarEmail(t);return}
   if(t.id==="btnNova")novaAfiliada();
   if(t.id==="btnImportar")abrirImportar();
+  if(t.dataset.abrir){abrir(t.dataset.abrir);return}
   if(["impBuscar","impLer"].includes(t.id)||t.dataset.impok){acaoImportar(t);return}
   if(t.id==="btnConfig")abrirConfig();
   if(t.id==="cfgSalvar")salvarConfig();

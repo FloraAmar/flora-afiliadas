@@ -81,6 +81,7 @@ const ETAPA_PUBLICA = {
   entregue: { t: "Hora do vídeo", d: "Seus looks chegaram. Poste o vídeo de recebidos dentro do prazo, marcando o @floraamaroficial, e envie o link aqui embaixo." },
   video: { t: "Vídeo recebido", d: "Estamos conferindo o vídeo e criando seu cupom de afiliada." },
   ativa: { t: "Afiliada ativa", d: "Seu cupom está liberado. Divulgue e ganhe comissão e crédito look em cada venda." },
+  encerrada: { t: "Parceria encerrada", d: "Sua parceria foi encerrada. Obrigada por ter feito parte do Programa de Afiliadas Flora Amar!" },
   recusada: { t: "Inscrição não aprovada", d: "Desta vez seu perfil não se encaixou no programa. Obrigada pelo interesse na Flora Amar!" },
 };
 
@@ -422,7 +423,7 @@ setInterval(async () => {
       try { await fecharMes(ant, true); } catch (e) { console.error("fechamento", e.message); }
       const c3 = await store.getConfig(); c3.__fechamentos = c3.__fechamentos || {}; c3.__fechamentos[ant] = { ...(c3.__fechamentos[ant] || {}), tentativas: (c3.__fechamentos[ant]?.tentativas || 0) + 1 }; await store.setConfig(c3);
     }
-    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); if (!c.__sync?.[ant]) await sincronizarVendas(ant); await sincronizarVendas(mesAtual()); }
+    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); for (const m of ultimos3Meses()) if (!c.__sync?.[m]) { await sincronizarVendas(m); await espera(2000); } await sincronizarVendas(mesAtual()); }
   } catch (e) { console.error("agenda", e.message); }
 }, 20 * 60e3);
 
@@ -482,6 +483,24 @@ app.post("/api/admin/fechamento/desfazer", exigeAdmin, async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(400).json({ erro: e.message }); }
 });
+/* ---- aviso: afiliadas que não bateram a meta nos últimos 3 meses fechados ---- */
+function ultimos3Meses() { const m1 = mesAnterior(); const m2 = mesAnterior(m1); const m3 = mesAnterior(m2); return [m3, m2, m1]; }
+function alertasMeta(todas, c) {
+  const meses = ultimos3Meses();
+  return todas.filter(r => r.etapa === "ativa").map(r => {
+    const inicio = String(r.origem || "").startsWith("Importada") ? "0000-00" : String(r.ativaEm || r.criadoEm || "9999").slice(0, 7);
+    if (inicio > meses[0]) return null; // ainda não completou 3 meses no programa
+    if (r.avisoMetaIgnorado === meses[2]) return null; // time decidiu manter neste ciclo
+    const m = meses.map(mes => ({ mes, nome: nomeMes(mes), total: resumoMes(r, mes, c).total }));
+    if (m.some(x => x.total >= c.metaMensal)) return null;
+    return { id: r.id, nome: r.nome, cupom: codigosAfiliada(r)[0] || "", meses: m };
+  }).filter(Boolean);
+}
+app.get("/api/admin/alertas-meta", exigeAdmin, async (req, res) => {
+  const c = await store.getConfig();
+  res.json({ meta: c.metaMensal, meses: ultimos3Meses().map(m => ({ mes: m, nome: nomeMes(m), sincronizado: !!c.__sync?.[m] })), lista: alertasMeta(await store.list(), c) });
+});
+
 /* ---- importar afiliadas que já existem (da wBuy ou de uma lista colada) ---- */
 async function listarTudo(caminho) {
   const out = [];
