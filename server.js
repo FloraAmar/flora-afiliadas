@@ -289,8 +289,8 @@ app.all("/webhook/wbuy/:key", async (req, res) => {
           mudou = true; achados.push("envio");
         }
       }
-      const cc = (r.cupom?.codigo || r.dadosWbuy?.cupom || "").toUpperCase();
-      if (cc && codigos.has(cc) && p.id && !(vc && cc === vc)) {
+      const cc = codigosAfiliada(r).find(x => x !== vc && (codigos.has(x) || (p.codigosPedido || []).includes(x)));
+      if (cc && p.id) {
         r.vendas = r.vendas || {};
         const ant = r.vendas[p.id] || {};
         r.vendas[p.id] = { total: p.total ?? ant.total ?? null, status: p.status ?? ant.status ?? "", statusId: p.statusId || ant.statusId || "", em: ant.em || p.data || new Date().toISOString(), atualizadoEm: new Date().toISOString(), fonte: "webhook" };
@@ -324,7 +324,7 @@ const mesAtual = () => hoje().slice(0, 7);
 const mesAnterior = (m = mesAtual()) => { const [a, b] = m.split("-").map(Number); const d = new Date(Date.UTC(a, b - 2, 1)); return d.toISOString().slice(0, 7); };
 const fimDoMes = m => { const [a, b] = m.split("-").map(Number); return new Date(Date.UTC(a, b, 0)).toISOString().slice(0, 10); };
 const nomeMes = m => { const [a, b] = m.split("-").map(Number); return ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][b - 1] + "/" + a; };
-function codigosAfiliada(r) { return [r.cupom?.codigo, r.dadosWbuy?.cupom].filter(Boolean).map(x => String(x).toUpperCase()); }
+function codigosAfiliada(r) { return [...new Set([r.cupom?.codigo, r.dadosWbuy?.cupom, ...(r.codigosWbuy || [])].filter(Boolean).map(x => String(x).toUpperCase().trim()))]; }
 async function sincronizarVendas(mes) {
   const ini = mes + "-01", fim = fimDoMes(mes);
   const todas = await store.list();
@@ -474,6 +474,57 @@ app.post("/api/admin/fechamento/desfazer", exigeAdmin, async (req, res) => {
     const c = await store.getConfig(); if (c.__fechamentos?.[mes]) { c.__fechamentos[mes].concluido = false; c.__fechamentos[mes].tentativas = 99; await store.setConfig(c); }
     res.json({ ok: true });
   } catch (e) { res.status(400).json({ erro: e.message }); }
+});
+/* ---- importar afiliadas que já existem (da wBuy ou de uma lista colada) ---- */
+async function listarTudo(caminho) {
+  const out = [];
+  for (let off = 0; off < 3000; off += 100) {
+    const j = await wbuy("GET", `${caminho}${caminho.includes("?") ? "&" : "?"}limit=${off},100`);
+    const l = Array.isArray(j.data) ? j.data : (j.data && typeof j.data === "object" ? Object.values(j.data) : []);
+    out.push(...l); if (l.length < 100) break; await espera(700);
+  }
+  return out;
+}
+app.get("/api/admin/importar/wbuy", exigeAdmin, async (req, res) => {
+  try {
+    const vendedores = await listarTudo("/partnerstore");
+    let cupons = []; try { cupons = await listarTudo("/coupon/"); } catch (e) { console.error("cupons", e.message); }
+    const todas = await store.list();
+    const emails = new Set(todas.map(r => (r.email || "").toLowerCase()).filter(Boolean));
+    const cods = new Set(todas.flatMap(codigosAfiliada));
+    const lista = vendedores.map(v => {
+      const id = String(v.id ?? v.vendedor_id ?? "");
+      const codigo = String(v.codigo || "").toUpperCase().trim();
+      const seus = cupons.filter(c => String(c.afiliado_id ?? c.vendedor_id ?? "") === id && id).map(c => String(c.cupom || "").toUpperCase().trim()).filter(Boolean);
+      const todosCods = [...new Set([codigo, ...seus].filter(Boolean))];
+      const email = String(v.email || "").toLowerCase().trim();
+      return { wbuyId: id, nome: limpa(v.nome, 120), email, codigo, cupons: todosCods, comissao: v.comissao ?? "", ativo: String(v.ativo ?? "1") !== "0", jaExiste: (email && emails.has(email)) || todosCods.some(c => cods.has(c)) };
+    });
+    res.json({ total: lista.length, lista });
+  } catch (e) { res.status(400).json({ erro: e.message }); }
+});
+app.post("/api/admin/importar", exigeAdmin, async (req, res) => {
+  const itens = Array.isArray(req.body?.itens) ? req.body.itens.slice(0, 500) : [];
+  const c = await store.getConfig(); const todas = await store.list();
+  const emails = new Set(todas.map(r => (r.email || "").toLowerCase()).filter(Boolean));
+  const cods = new Set(todas.flatMap(codigosAfiliada));
+  let criadas = 0, puladas = 0;
+  for (const it of itens) {
+    const nome = limpa(it.nome, 120); const email = limpa(it.email, 160).toLowerCase();
+    const codigos = [...new Set((Array.isArray(it.cupons) ? it.cupons : [it.cupom]).map(x => limpa(x, 30).toUpperCase().replace(/\s+/g, "")).filter(x => /^[A-Z0-9_-]{2,30}$/.test(x)))];
+    if (!nome || (!email && !codigos.length)) { puladas++; continue; }
+    if ((email && emails.has(email)) || codigos.some(x => cods.has(x))) { puladas++; continue; }
+    const id = "af" + Date.now().toString(36) + crypto.randomBytes(2).toString("hex");
+    await store.put(id, {
+      nome, email, instagram: limpa(it.instagram, 120), whatsapp: limpa(it.whatsapp, 30), protocolo: novoProtocolo(), etapa: "ativa",
+      origem: it.wbuyId ? "Importada da wBuy" : "Importada de lista", wbuyVendedorId: limpa(it.wbuyId, 20) || undefined,
+      cupom: codigos[0] ? { codigo: codigos[0], desconto: c.desconto, comissao: Number(it.comissao) || c.nivel1Comissao, cadastradoWbuy: true, afiliadaCadastrada: true, grupo: true } : undefined,
+      codigosWbuy: codigos.slice(1), criadoEm: new Date().toISOString(), ativaEm: hoje(),
+      historico: [{ em: hoje(), t: it.wbuyId ? "Afiliada importada da wBuy (já ativa)" : "Afiliada importada de lista (já ativa)" }],
+    });
+    if (email) emails.add(email); codigos.forEach(x => cods.add(x)); criadas++;
+  }
+  res.json({ criadas, puladas });
 });
 app.get("/api/admin/webhook-log", exigeAdmin, async (req, res) => res.json((await store.getConfig()).__webhookLog || []));
 app.put("/api/admin/config", exigeAdmin, async (req, res) => {

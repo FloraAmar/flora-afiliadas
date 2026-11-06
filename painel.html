@@ -125,6 +125,7 @@ a.btn{display:inline-flex;align-items:center}
     <div class="actions">
       <a class="btn ghost" href="/" target="_blank" rel="noopener" style="text-decoration:none">Ver página pública</a>
       <button id="btnConfig" class="ghost">Regras do programa</button>
+      <button id="btnImportar" class="ghost">Importar afiliadas</button>
       <button id="btnNova" class="primary">+ Nova afiliada</button>
       <button id="btnSair" class="ghost small">Sair</button>
     </div>
@@ -397,6 +398,32 @@ async function acaoVendas(t){
     if(t.dataset.desfazer){t.disabled=true;await api("POST","/api/admin/fechamento/desfazer",{id:t.dataset.desfazer,mes:vendasMes});toast("Crédito estornado");await carregarVendas()}
   }catch(e){if(e.message!=="login")toast(e.message);t.disabled=false}
 }
+/* ---------- importar ---------- */
+let impLista=[];
+function abrirImportar(){
+  aberta="__importar";draft=null;
+  $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Importar afiliadas"><div class="dhead"><h2>Importar afiliadas</h2><button class="ghost small" id="fechar">Fechar</button></div>
+  <div class="box"><h4>Da wBuy</h4><p class="note" style="margin:0">Busca as afiliadas cadastradas em Afiliados na wBuy, com o código e os cupons de cada uma. Elas entram no painel já como “Afiliada ativa”, e as vendas passam a contar.</p>${cfg.wbuyApi?`<div class="btnrow"><button class="primary" id="impBuscar">Buscar afiliadas na wBuy</button></div>`:`<p class="note" style="margin:0">Conecte a API da wBuy para usar esta opção.</p>`}<div id="impWbuy"></div></div>
+  <div class="box"><h4>Colar uma lista</h4><p class="note" style="margin:0">Uma afiliada por linha, separando por ponto e vírgula: <b>Nome; e-mail; CUPOM; @instagram; WhatsApp</b>. Pode colar direto de uma planilha (colunas nessa ordem).</p>
+  <textarea id="impTexto" style="min-height:140px" placeholder="Ana Souza; ana@gmail.com; ANA5; @anasouza; (11) 98888-7777"></textarea>
+  <div class="btnrow"><button id="impLer">Conferir lista</button></div><div id="impManual"></div></div></aside>`;
+}
+function tabelaImp(lista,origem){
+  if(!lista.length)return `<p class="note">Nenhuma afiliada encontrada.</p>`;
+  return `<div class="tbl-wrap" style="margin-top:8px"><table class="v" style="min-width:520px"><thead><tr><th></th><th>Afiliada</th><th>Cupom(ns)</th><th></th></tr></thead><tbody>${lista.map((a,i)=>`<tr><td><input type="checkbox" class="impChk" data-o="${origem}" data-i="${i}" ${a.jaExiste||a.ativo===false||(!a.email&&!a.cupons.length)?"":"checked"} ${a.jaExiste?"disabled":""}></td><td><b>${esc(a.nome)}</b><br><span class="note">${esc(a.email||"sem e-mail")}</span></td><td>${a.cupons.map(c=>`<span class="code">${esc(c)}</span>`).join(" ")||'<span class="note">sem cupom</span>'}</td><td>${a.jaExiste?'<span class="pill">já no painel</span>':a.ativo===false?'<span class="pill warn">inativa na wBuy</span>':""}</td></tr>`).join("")}</tbody></table></div>
+  <div class="btnrow" style="margin-top:8px"><button class="primary" data-impok="${origem}">Importar selecionadas</button></div>`;
+}
+async function acaoImportar(t){
+  try{
+    if(t.id==="impBuscar"){t.disabled=true;t.textContent="Buscando…";const r=await api("GET","/api/admin/importar/wbuy");impLista=r.lista;$("#impWbuy").innerHTML=tabelaImp(impLista,"w");t.disabled=false;t.textContent="Buscar de novo"}
+    if(t.id==="impLer"){const ems=new Set(rows.map(r=>(r.email||"").toLowerCase()));const cs=new Set(rows.flatMap(r=>[r.cupom?.codigo,r.dadosWbuy?.cupom,...(r.codigosWbuy||[])].filter(Boolean).map(x=>x.toUpperCase())));
+      window.__impM=$("#impTexto").value.split(/\r?\n/).map(l=>l.split(/;|\t/).map(x=>x.trim())).filter(c=>c[0]).map(c=>{const cup=(c[2]||"").toUpperCase().replace(/\s+/g,"");return{nome:c[0],email:(c[1]||"").toLowerCase(),cupons:cup?[cup]:[],instagram:c[3]||"",whatsapp:c[4]||"",jaExiste:(c[1]&&ems.has(c[1].toLowerCase()))||(cup&&cs.has(cup))}});
+      $("#impManual").innerHTML=tabelaImp(window.__impM,"m")}
+    if(t.dataset.impok){const lista=t.dataset.impok==="w"?impLista:window.__impM;const sel=[...document.querySelectorAll(`.impChk[data-o="${t.dataset.impok}"]:checked`)].map(x=>lista[Number(x.dataset.i)]);
+      if(!sel.length){toast("Selecione ao menos uma afiliada");return}
+      t.disabled=true;t.textContent="Importando…";const r=await api("POST","/api/admin/importar",{itens:sel});toast(`${r.criadas} importada${r.criadas!==1?"s":""}${r.puladas?" · "+r.puladas+" pulada"+(r.puladas!==1?"s":""):""}`);fechar();await carregar()}
+  }catch(e){if(e.message!=="login")toast(e.message);t.disabled=false}
+}
 function novaAfiliada(){aberta="__novo";draft={etapa:"proposta"};renderDrawer()}
 function abrirConfig(){
   aberta="__config";draft=null;const n=(k,l,extra="")=>`<label class="f">${l}<input id="cfg-${k}" type="number" min="0" value="${esc(cfg[k])}" ${extra}></label>`;
@@ -433,6 +460,8 @@ document.addEventListener("click",async e=>{
   if(t.dataset.cp!==undefined){copiar(t.dataset.cp,t);return}
   if(t.dataset.mail){enviarEmail(t);return}
   if(t.id==="btnNova")novaAfiliada();
+  if(t.id==="btnImportar")abrirImportar();
+  if(["impBuscar","impLer"].includes(t.id)||t.dataset.impok){acaoImportar(t);return}
   if(t.id==="btnConfig")abrirConfig();
   if(t.id==="cfgSalvar")salvarConfig();
   if(t.dataset.tab){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));const v=t.dataset.tab==="vendas";$("#vendasView").hidden=!v;$("#afiliadasView").hidden=v;$("#vendasView").style.display=v?"flex":"";$("#vendasView").style.flexDirection="column";$("#vendasView").style.gap="16px";if(v)carregarVendas();return}
