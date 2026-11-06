@@ -22,7 +22,18 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
   mailer = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 465), secure: Number(process.env.SMTP_PORT || 465) === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
 }
 const EMAIL_FROM = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `Flora Amar <${process.env.SMTP_USER}>` : "");
-const DEFAULT_CONFIG = { voucherValor: 500, desconto: 5, comissao: 5, prazoDias: 15, validadeVoucherDias: 30, minSeguidores: 1000, creditoLook: 10, metaMensal: 500, whatsapp: "(11) 92040-3050", inscricoesAbertas: true };
+const DEFAULT_CONFIG = { voucherValor: 500, desconto: 5, comissao: 5, prazoDias: 15, validadeVoucherDias: 30, minSeguidores: 1000, creditoLook: 10, metaMensal: 500, whatsapp: "(11) 92040-3050", inscricoesAbertas: true,
+  nivel1Ate: 10000, nivel1Comissao: 5, nivel1Bonus: 10, nivel2Ate: 20000, nivel2Comissao: 6, nivel2Bonus: 7, nivel3Comissao: 7, nivel3Bonus: 5,
+  autoFechamento: true };
+// níveis por conversão mensal (Bronze, Prata, Ouro)
+function nivelDe(total, c) {
+  if (total > c.nivel2Ate) return { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null };
+  if (total > c.nivel1Ate) return { nome: "Prata", comissao: c.nivel2Comissao, bonus: c.nivel2Bonus, proximo: { nome: "Ouro", falta: c.nivel2Ate - total } };
+  return { nome: "Bronze", comissao: c.nivel1Comissao, bonus: c.nivel1Bonus, proximo: { nome: "Prata", falta: c.nivel1Ate - total } };
+}
+const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const STATUS_VALIDOS = new Set(["3", "4", "5", "7", "9", "12", "13", "14", "15", "16"]); // pagos/em andamento/concluídos
+const STATUS_INVALIDOS = new Set(["1", "2", "6", "8", "10", "11"]); // aguardando, análise, cancelado, negado, devolvido
 
 /* ---------------- armazenamento ---------------- */
 let store;
@@ -102,7 +113,7 @@ app.get("/healthz", (req, res) => res.send("ok"));
 
 app.get("/api/config-publica", async (req, res) => {
   const c = await store.getConfig();
-  res.json({ voucherValor: c.voucherValor, desconto: c.desconto, comissao: c.comissao, prazoDias: c.prazoDias, validadeVoucherDias: c.validadeVoucherDias, minSeguidores: c.minSeguidores, creditoLook: c.creditoLook, metaMensal: c.metaMensal, whatsapp: c.whatsapp, inscricoesAbertas: c.inscricoesAbertas });
+  res.json({ voucherValor: c.voucherValor, desconto: c.desconto, comissao: c.comissao, prazoDias: c.prazoDias, validadeVoucherDias: c.validadeVoucherDias, minSeguidores: c.minSeguidores, creditoLook: c.creditoLook, metaMensal: c.metaMensal, whatsapp: c.whatsapp, niveis: [{ nome: "Bronze", de: 0, ate: c.nivel1Ate, comissao: c.nivel1Comissao, bonus: c.nivel1Bonus }, { nome: "Prata", de: c.nivel1Ate, ate: c.nivel2Ate, comissao: c.nivel2Comissao, bonus: c.nivel2Bonus }, { nome: "Ouro", de: c.nivel2Ate, ate: null, comissao: c.nivel3Comissao, bonus: c.nivel3Bonus }], inscricoesAbertas: c.inscricoesAbertas });
 });
 
 app.post("/api/inscricao", limite(8, 60 * 60e3), async (req, res) => {
@@ -138,6 +149,7 @@ function viewPublica(r, c) {
   if (r.etapa === "aprovada") { v.cadastroPendente = !r.dadosWbuy; v.linkCadastro = `/cadastro?p=${r.protocolo}&t=${tokenCadastro(r.protocolo)}`; }
   if (["enviado"].includes(r.etapa)) v.envio = { metodo: r.envioMetodo, rastreio: r.rastreio };
   if (r.etapa === "entregue") { v.prazoVideo = r.prazoVideo; v.videoLink = r.videoLink || ""; }
+  if (r.etapa === "ativa") { const rs = resumoMes(r, mesAtual(), c); v.mes = { nome: nomeMes(mesAtual()), total: rs.total, qtd: rs.qtd, nivel: rs.nivel, bonusPct: rs.bonusPct, comissaoPct: rs.comissaoPct, bonusValor: rs.bonusValor, proximo: rs.proximo }; const fa = r.fechamentos?.[mesAnterior()]; if (fa) v.mesAnterior = { nome: nomeMes(mesAnterior()), total: fa.total, nivel: fa.nivel, bonusValor: fa.bonusValor, lancado: !!fa.creditoLancado }; }
   if (r.etapa === "ativa" && r.cupom) v.cupom = { codigo: r.cupom.codigo, desconto: r.cupom.desconto, comissao: r.cupom.comissao, creditoLook: r.cupom.creditoLook ?? c.creditoLook };
   return v;
 }
@@ -216,7 +228,23 @@ function varrer(obj, fn, chave = "", prof = 0) {
   if (typeof obj === "object") return Object.entries(obj).forEach(([k, v]) => varrer(v, fn, k, prof + 1));
   fn(chave, obj);
 }
+function normalizarPedido(o) {
+  // formato oficial da API/webhook da wBuy (pedido com cupom, vendedor, valor_total, status{id,nome})
+  if (!o || typeof o !== "object" || !o.id || !(o.valor_total || o.cupom || o.status)) return null;
+  const vt = o.valor_total || {};
+  const sub = Number(vt.subtotal), desc = Number(vt.desconto) || 0, tot = Number(vt.total);
+  const base = !isNaN(sub) && sub > 0 ? r2(sub - desc) : (!isNaN(tot) ? r2(tot - (Number(o.frete?.valor) || 0)) : null);
+  const st = typeof o.status === "object" ? o.status : { id: String(o.status ?? ""), nome: "" };
+  const codigos = [o.cupom?.cupom, o.vendedor?.codigo].filter(Boolean).map(x => String(x).toUpperCase().trim());
+  return { id: String(o.id), data: String(o.data || "").replace(" ", "T"), statusId: String(st.id ?? ""), status: st.nome || String(st.id ?? ""), base, codigos };
+}
+function acharPedido(corpo) {
+  for (const cand of [corpo, corpo?.data, corpo?.pedido, corpo?.order, Array.isArray(corpo?.data) ? corpo.data[0] : null]) { const n = normalizarPedido(cand); if (n) return n; }
+  return null;
+}
 function dadosPedido(corpo) {
+  const n = acharPedido(corpo);
+  if (n) { const textos = []; varrer(corpo, (k, v) => { if (typeof v === "string") textos.push(v.toUpperCase().trim()); }); return { id: n.id, total: n.base, status: n.status, statusId: n.statusId, data: n.data, textos, codigosPedido: n.codigos }; }
   let id = null, total = null, status = null; const textos = [];
   varrer(corpo, (k, v) => {
     const kl = k.toLowerCase();
@@ -225,7 +253,7 @@ function dadosPedido(corpo) {
     if (total == null && /^(total|valor_total|total_pedido|valortotal|order_total|valor)$/.test(kl)) { const n = Number(String(v).replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); if (!isNaN(n) && n > 0) total = n; }
     if (status == null && /^(status|situacao|status_nome|status_pedido|order_status)$/.test(kl) && typeof v !== "object") status = String(v);
   });
-  return { id, total, status, textos };
+  return { id, total, status, statusId: /^\d+$/.test(String(status || "")) ? String(status) : "", textos };
 }
 app.all("/webhook/wbuy/:key", async (req, res) => {
   if (req.params.key !== WEBHOOK_KEY) return res.status(404).send("not found");
@@ -250,12 +278,12 @@ app.all("/webhook/wbuy/:key", async (req, res) => {
       const pedVoucher = r.voucher?.pedidoUso || r.pedido;
       if (p.id && pedVoucher && String(pedVoucher) === p.id && p.status) {
         const st = p.status.toLowerCase();
-        if (/entregue|conclu|finaliz/.test(st) && ["compra", "enviado"].includes(r.etapa)) {
+        if ((/entregue|conclu|finaliz/.test(st) || p.statusId === "7") && ["compra", "enviado"].includes(r.etapa)) {
           r.entregueEm = hoje(); r.enviadoEm = r.enviadoEm || hoje(); r.etapa = "entregue";
           const d = new Date(r.entregueEm + "T12:00:00"); d.setDate(d.getDate() + Number(r.prazoDias || 15)); r.prazoVideo = d.toISOString().slice(0, 10);
           r.historico = [...(r.historico || []), { em: hoje(), t: `Pedido ${p.id} entregue (aviso automático da wBuy) · vídeo até ${r.prazoVideo.split("-").reverse().join("/")}` }];
           mudou = true; achados.push("entrega");
-        } else if (/envi|despach|transport|saiu/.test(st) && r.etapa === "compra") {
+        } else if ((/envi|despach|transport|saiu/.test(st) || ["5", "15"].includes(p.statusId)) && r.etapa === "compra") {
           r.enviadoEm = hoje(); r.etapa = "enviado";
           r.historico = [...(r.historico || []), { em: hoje(), t: `Pedido ${p.id} enviado (aviso automático da wBuy)` }];
           mudou = true; achados.push("envio");
@@ -265,7 +293,7 @@ app.all("/webhook/wbuy/:key", async (req, res) => {
       if (cc && codigos.has(cc) && p.id && !(vc && cc === vc)) {
         r.vendas = r.vendas || {};
         const ant = r.vendas[p.id] || {};
-        r.vendas[p.id] = { total: p.total ?? ant.total ?? null, status: p.status ?? ant.status ?? "", em: ant.em || new Date().toISOString(), atualizadoEm: new Date().toISOString() };
+        r.vendas[p.id] = { total: p.total ?? ant.total ?? null, status: p.status ?? ant.status ?? "", statusId: p.statusId || ant.statusId || "", em: ant.em || p.data || new Date().toISOString(), atualizadoEm: new Date().toISOString(), fonte: "webhook" };
         mudou = true; achados.push(`cupom ${cc}`);
       }
       if (mudou) await store.put(r.id, r);
@@ -275,6 +303,121 @@ app.all("/webhook/wbuy/:key", async (req, res) => {
     const c = await store.getConfig(); c.__webhookLog = log.slice(0, 20); await store.setConfig(c);
   } catch (e) { console.error("webhook", e); }
 });
+
+/* ---- API REST da wBuy: sincroniza vendas e lança o Bônus Look como crédito do cliente ---- */
+const WBUY_BASE = process.env.WBUY_BASE || "https://sistema.sistemawbuy.com.br/api/v1";
+const wbuyConfigurada = () => !!(process.env.WBUY_API_USER && process.env.WBUY_API_PASS);
+const espera = ms => new Promise(r => setTimeout(r, ms));
+async function wbuy(metodo, caminho, corpo) {
+  if (!wbuyConfigurada()) throw new Error("API da wBuy não configurada no Render (WBUY_API_USER e WBUY_API_PASS).");
+  const auth = Buffer.from(`${process.env.WBUY_API_USER}:${process.env.WBUY_API_PASS}`).toString("base64");
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const r = await fetch(WBUY_BASE + caminho, { method: metodo, headers: { Authorization: "Bearer " + auth, "User-Agent": `FloraAmarAfiliadas (${process.env.WBUY_CONTACT || "afiliadas"})`, "Content-Type": "application/json", Accept: "application/json" }, body: corpo ? JSON.stringify(corpo) : undefined });
+    if (r.status === 429) { await espera(15000); continue; }
+    const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch { j = { raw: txt.slice(0, 300) }; }
+    if (!r.ok || (j.responseCode && Number(j.responseCode) >= 400)) throw new Error(`wBuy ${metodo} ${caminho.split("?")[0]}: ${r.status} ${j.message || j.raw || ""}`.trim());
+    return j;
+  }
+  throw new Error("wBuy: limite de requisições atingido, tente em 1 minuto.");
+}
+const mesAtual = () => hoje().slice(0, 7);
+const mesAnterior = (m = mesAtual()) => { const [a, b] = m.split("-").map(Number); const d = new Date(Date.UTC(a, b - 2, 1)); return d.toISOString().slice(0, 7); };
+const fimDoMes = m => { const [a, b] = m.split("-").map(Number); return new Date(Date.UTC(a, b, 0)).toISOString().slice(0, 10); };
+const nomeMes = m => { const [a, b] = m.split("-").map(Number); return ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][b - 1] + "/" + a; };
+function codigosAfiliada(r) { return [r.cupom?.codigo, r.dadosWbuy?.cupom].filter(Boolean).map(x => String(x).toUpperCase()); }
+async function sincronizarVendas(mes) {
+  const ini = mes + "-01", fim = fimDoMes(mes);
+  const todas = await store.list();
+  const porCodigo = new Map(); for (const r of todas) for (const c of codigosAfiliada(r)) if (c !== r.voucher?.codigo?.toUpperCase()) porCodigo.set(c, r);
+  const alteradas = new Set(); let lidos = 0, achados = 0;
+  for (let off = 0; off < 5000; off += 100) {
+    const j = await wbuy("GET", `/order/?periodo_inicial=${ini}&periodo_final=${fim}&order=id,asc&limit=${off},100`);
+    const lista = Array.isArray(j.data) ? j.data : [];
+    for (const o of lista) {
+      const n = normalizarPedido(o); if (!n) continue; lidos++;
+      const r = n.codigos.map(c => porCodigo.get(c)).find(Boolean); if (!r) continue;
+      r.vendas = r.vendas || {};
+      r.vendas[n.id] = { ...(r.vendas[n.id] || {}), total: n.base, status: n.status, statusId: n.statusId, em: n.data || ini, atualizadoEm: new Date().toISOString(), fonte: "api" };
+      alteradas.add(r); achados++;
+    }
+    if (lista.length < 100) break;
+    await espera(700);
+  }
+  for (const r of alteradas) await store.put(r.id, r);
+  const c = await store.getConfig(); c.__sync = { ...(c.__sync || {}), [mes]: { em: new Date().toISOString(), lidos, achados } }; await store.setConfig(c);
+  return { mes, lidos, achados };
+}
+function vendaConta(v) { if (v.statusId) return !STATUS_INVALIDOS.has(String(v.statusId)); return !/cancel|devolv|estorn|recus|negad|aguard|análise|analise/i.test(v.status || ""); }
+function resumoMes(r, mes, c) {
+  const vs = Object.entries(r.vendas || {}).map(([id, v]) => ({ id, ...v })).filter(v => String(v.em || "").slice(0, 7) === mes);
+  const validas = vs.filter(vendaConta);
+  const total = r2(validas.reduce((a, v) => a + (Number(v.total) || 0), 0));
+  const nv = nivelDe(total, c);
+  return { total, qtd: validas.length, pendentes: vs.length - validas.length, nivel: nv.nome, comissaoPct: nv.comissao, bonusPct: nv.bonus, comissaoValor: r2(total * nv.comissao / 100), bonusValor: r2(total * nv.bonus / 100), proximo: nv.proximo, metaOk: total >= c.metaMensal, vendas: vs.sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 50) };
+}
+async function acharClienteWbuy(r) {
+  const emails = [r.dadosWbuy?.emailLoja, r.dadosWbuy?.email, r.email].filter(Boolean).map(e => e.toLowerCase());
+  for (const e of [...new Set(emails)]) {
+    const j = await wbuy("GET", `/customer/?q=${encodeURIComponent(e)}&limit=0,20`);
+    const c = (Array.isArray(j.data) ? j.data : []).find(x => String(x.email || "").toLowerCase() === e);
+    if (c) return c;
+  }
+  const cpf = r.dadosWbuy?.cpf;
+  if (cpf) { const f = cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4"); for (const d of [f, cpf]) { const j = await wbuy("GET", `/customer/?doc1=${encodeURIComponent(d)}&limit=0,5`); const c = (Array.isArray(j.data) ? j.data : [])[0]; if (c) return c; } }
+  return null;
+}
+let fechandoAgora = false;
+async function fecharMes(mes, lancar) {
+  if (fechandoAgora) throw new Error("Já existe um fechamento em andamento.");
+  fechandoAgora = true;
+  try {
+    const sync = wbuyConfigurada() ? await sincronizarVendas(mes) : null;
+    const c = await store.getConfig();
+    const todas = await store.list(); const linhas = [];
+    for (const r of todas) {
+      if (!["ativa", "video"].includes(r.etapa) && !(r.vendas && Object.keys(r.vendas).length)) continue;
+      const rs = resumoMes(r, mes, c);
+      r.fechamentos = r.fechamentos || {};
+      const ant = r.fechamentos[mes] || {};
+      const f = { ...ant, mes, total: rs.total, qtd: rs.qtd, nivel: rs.nivel, comissaoPct: rs.comissaoPct, comissaoValor: rs.comissaoValor, bonusPct: rs.bonusPct, bonusValor: rs.bonusValor, metaOk: rs.metaOk, calculadoEm: new Date().toISOString() };
+      if (ant.creditoLancado) { f.bonusValor = ant.bonusValor; f.total = ant.total; f.nivel = ant.nivel; f.bonusPct = ant.bonusPct; }
+      if (lancar && !ant.creditoLancado && f.bonusValor > 0) {
+        try {
+          const cli = await acharClienteWbuy(r);
+          if (!cli) f.erro = "Cliente não encontrado na loja (confira o e-mail do cadastro na loja).";
+          else {
+            await wbuy("POST", `/customer/credit/${cli.id}`, { tipo: 1, valor: f.bonusValor, observacoes: `Bônus Look ${nomeMes(mes)} · Programa de Afiliadas (nível ${f.nivel})` });
+            Object.assign(f, { creditoLancado: true, creditoEm: new Date().toISOString(), clienteId: String(cli.id), erro: "" });
+            r.historico = [...(r.historico || []), { em: hoje(), t: `Bônus Look de ${nomeMes(mes)} lançado: R$ ${f.bonusValor.toFixed(2).replace(".", ",")} (nível ${f.nivel})` }];
+          }
+        } catch (e) { f.erro = e.message; }
+        await espera(500);
+      }
+      r.fechamentos[mes] = f; await store.put(r.id, r);
+      linhas.push({ id: r.id, nome: r.nome, ...f });
+    }
+    const c2 = await store.getConfig();
+    const resumo = { mes, em: new Date().toISOString(), lancado: !!lancar, afiliadas: linhas.length, totalVendas: r2(linhas.reduce((a, l) => a + l.total, 0)), totalBonus: r2(linhas.reduce((a, l) => a + (l.bonusValor || 0), 0)), totalComissao: r2(linhas.reduce((a, l) => a + (l.comissaoValor || 0), 0)), erros: linhas.filter(l => l.erro).length, sync };
+    if (lancar) resumo.concluido = resumo.erros === 0;
+    c2.__fechamentos = { ...(c2.__fechamentos || {}), [mes]: { ...(c2.__fechamentos?.[mes] || {}), ...resumo } }; await store.setConfig(c2);
+    return { ...resumo, linhas };
+  } finally { fechandoAgora = false; }
+}
+// agenda: todo dia 01 (a partir das 6h de Brasília) fecha o mês anterior; a cada 6h atualiza as vendas do mês atual
+let ultimaSync = 0;
+setInterval(async () => {
+  try {
+    if (!wbuyConfigurada()) return;
+    const c = await store.getConfig();
+    const agoraBR = new Date(Date.now() - 3 * 3600e3);
+    const ant = mesAnterior();
+    if (c.autoFechamento && agoraBR.getUTCHours() >= 6 && !c.__fechamentos?.[ant]?.concluido && !(c.__fechamentos?.[ant]?.tentativas >= 5)) {
+      try { await fecharMes(ant, true); } catch (e) { console.error("fechamento", e.message); }
+      const c3 = await store.getConfig(); c3.__fechamentos = c3.__fechamentos || {}; c3.__fechamentos[ant] = { ...(c3.__fechamentos[ant] || {}), tentativas: (c3.__fechamentos[ant]?.tentativas || 0) + 1 }; await store.setConfig(c3);
+    }
+    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); await sincronizarVendas(mesAtual()); }
+  } catch (e) { console.error("agenda", e.message); }
+}, 20 * 60e3);
 
 /* ---- painel ---- */
 app.post("/api/login", limite(10, 15 * 60e3), (req, res) => {
@@ -301,14 +444,44 @@ app.put("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => {
   await store.put(id, data); res.json({ ok: true, id, protocolo: data.protocolo });
 });
 app.delete("/api/admin/afiliadas/:id", exigeAdmin, async (req, res) => { await store.del(String(req.params.id)); res.json({ ok: true }); });
-app.get("/api/admin/config", exigeAdmin, async (req, res) => { const c = await store.getConfig(); const log = c.__webhookLog || []; delete c.__webhookLog; res.json({ ...c, emailAutomatico: !!mailer, webhookUrl: `${req.protocol}://${req.get("host")}/webhook/wbuy/${WEBHOOK_KEY}`, webhookUltimo: log[0] || null, webhookTotal: log.length }); });
+app.get("/api/admin/config", exigeAdmin, async (req, res) => { const c = await store.getConfig(); const log = c.__webhookLog || []; for (const k of Object.keys(c)) if (k.startsWith("__")) delete c[k]; res.json({ ...c, wbuyApi: wbuyConfigurada(), emailAutomatico: !!mailer, webhookUrl: `${req.protocol}://${req.get("host")}/webhook/wbuy/${WEBHOOK_KEY}`, webhookUltimo: log[0] || null, webhookTotal: log.length }); });
+app.get("/api/admin/vendas", exigeAdmin, async (req, res) => {
+  const mes = /^\d{4}-\d{2}$/.test(String(req.query.mes || "")) ? req.query.mes : mesAtual();
+  const c = await store.getConfig();
+  const linhas = (await store.list()).filter(r => ["ativa", "video"].includes(r.etapa) || Object.keys(r.vendas || {}).length || r.fechamentos?.[mes])
+    .map(r => ({ id: r.id, nome: r.nome, instagram: r.instagram, cupom: r.cupom?.codigo || r.dadosWbuy?.cupom || "", etapa: r.etapa, ...resumoMes(r, mes, c), fechamento: r.fechamentos?.[mes] || null }))
+    .sort((a, b) => b.total - a.total);
+  res.json({ mes, mesAtual: mesAtual(), api: wbuyConfigurada(), sync: c.__sync?.[mes] || null, fechamento: c.__fechamentos?.[mes] || null, linhas });
+});
+app.post("/api/admin/vendas/sync", exigeAdmin, async (req, res) => {
+  const mes = /^\d{4}-\d{2}$/.test(String(req.body?.mes || "")) ? req.body.mes : mesAtual();
+  try { res.json(await sincronizarVendas(mes)); } catch (e) { res.status(400).json({ erro: e.message }); }
+});
+app.post("/api/admin/fechamento", exigeAdmin, async (req, res) => {
+  const mes = String(req.body?.mes || "");
+  if (!/^\d{4}-\d{2}$/.test(mes) || mes >= mesAtual()) return res.status(400).json({ erro: "Escolha um mês que já terminou." });
+  try { res.json(await fecharMes(mes, !!req.body?.lancar)); } catch (e) { res.status(400).json({ erro: e.message }); }
+});
+app.post("/api/admin/fechamento/desfazer", exigeAdmin, async (req, res) => {
+  const { id, mes } = req.body || {};
+  const r = await store.get(String(id || "")); const f = r?.fechamentos?.[mes];
+  if (!f?.creditoLancado) return res.status(400).json({ erro: "Não há crédito lançado para desfazer." });
+  try {
+    await wbuy("POST", `/customer/credit/${f.clienteId}`, { tipo: 2, valor: f.bonusValor, observacoes: `Estorno Bônus Look ${nomeMes(mes)} · Programa de Afiliadas` });
+    f.creditoLancado = false; f.estornadoEm = new Date().toISOString();
+    r.historico = [...(r.historico || []), { em: hoje(), t: `Bônus Look de ${nomeMes(mes)} estornado` }];
+    await store.put(r.id, r);
+    const c = await store.getConfig(); if (c.__fechamentos?.[mes]) { c.__fechamentos[mes].concluido = false; c.__fechamentos[mes].tentativas = 99; await store.setConfig(c); }
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ erro: e.message }); }
+});
 app.get("/api/admin/webhook-log", exigeAdmin, async (req, res) => res.json((await store.getConfig()).__webhookLog || []));
 app.put("/api/admin/config", exigeAdmin, async (req, res) => {
   const b = req.body || {}; const c = { ...DEFAULT_CONFIG };
   delete b.emailAutomatico;
   for (const k of Object.keys(DEFAULT_CONFIG)) if (k in b) c[k] = typeof DEFAULT_CONFIG[k] === "number" ? (Number(b[k]) >= 0 ? Number(b[k]) : DEFAULT_CONFIG[k]) : typeof DEFAULT_CONFIG[k] === "boolean" ? !!b[k] : limpa(b[k], 40);
-  const atual = await store.getConfig(); if (atual.__webhookLog) c.__webhookLog = atual.__webhookLog;
-  await store.setConfig(c); const { __webhookLog, ...pub } = c; res.json(pub);
+  const atual = await store.getConfig(); for (const k of Object.keys(atual)) if (k.startsWith("__")) c[k] = atual[k];
+  await store.setConfig(c); const pub = {}; for (const k of Object.keys(c)) if (!k.startsWith("__")) pub[k] = c[k]; res.json(pub);
 });
 
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: "Algo deu errado. Tente de novo em instantes." }); });

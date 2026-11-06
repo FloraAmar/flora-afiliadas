@@ -59,6 +59,12 @@ h2{font-size:clamp(26px,3.6vw,38px);line-height:1.12;margin-bottom:8px}
 .passos p{margin:0;color:var(--muted);font-size:13.5px}
 .passos .imp{font-size:12.5px;color:var(--fg);background:var(--accent-soft);border-radius:8px;padding:6px 9px;margin-top:4px}
 .dica{margin-top:34px;background:var(--sunk);border-radius:var(--r);padding:16px 20px;font-family:var(--script);font-size:30px;line-height:1.2;text-align:center}
+.niveis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.nivel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:4px}
+.nivel b{font-size:20px;text-transform:uppercase;letter-spacing:.04em}
+.nivel span{color:var(--muted);font-size:14px}
+.nivel span:nth-of-type(2),.nivel span:nth-of-type(3){color:var(--fg);font-weight:600}
+@media (max-width:640px){.niveis{grid-template-columns:1fr}}
 .req{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .req div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .req b{display:block;margin-bottom:2px;font-weight:600}
@@ -117,9 +123,9 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
       <div class="ctas"><a class="cta" href="#inscricao">Quero ser afiliada</a><a class="cta alt" href="#regulamento">Ler o regulamento</a></div></div>
     <div class="retorno">
       <div class="sc">Total de retorno</div>
-      <div class="big"><b data-v="total">15%</b><span>sobre as vendas geradas com o seu cupom</span></div>
+      <div class="big"><b>15%</b><span>de retorno sobre as vendas no nível Bronze: comissão + Bônus Look</span></div>
       <hr>
-      <ul><li><b data-v="comissao">5%</b> de comissão sobre as vendas</li><li><b data-v="credito">10%</b> em crédito look para novas compras</li><li><b data-v="voucher">R$ 500</b> em voucher para o seu primeiro pedido</li></ul>
+      <ul><li><b>Comissão em dinheiro</b> de <span data-v="comMin">5%</span> a <span data-v="comMax">7%</span>, conforme o seu nível</li><li><b>Bônus Look</b> creditado na sua conta da loja todo dia 01</li><li><b data-v="voucher">R$ 500</b> em voucher para o seu primeiro pedido</li></ul>
     </div>
   </header>
 </div>
@@ -128,9 +134,12 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
   <h2>Benefícios da afiliada</h2><p class="lead">Ao fazer parte do Programa de Afiliadas, você recebe:</p>
   <div class="beneficios">
     <div class="ben"><small>Cupom exclusivo</small><b><span data-v="desconto">5%</span> OFF</b><span>para compartilhar com as suas seguidoras</span></div>
-    <div class="ben"><small>Comissão</small><b data-v="comissao">5%</b><span>sobre todas as vendas realizadas através do seu cupom</span></div>
-    <div class="ben"><small>Crédito look</small><b data-v="credito">10%</b><span>do valor convertido em vendas, para usar em novas compras no site</span></div>
+    <div class="ben"><small>Comissão em dinheiro</small><b><span data-v="comMin">5%</span>–<span data-v="comMax">7%</span></b><span>sobre todas as vendas realizadas através do seu cupom</span></div>
+    <div class="ben"><small>Bônus Look</small><b>Todo dia 01</b><span>crédito na sua conta da loja para usar em novas compras no site</span></div>
   </div>
+  <h3 style="margin:34px 0 10px;text-transform:uppercase;letter-spacing:.06em;font-size:15px">Níveis por conversão mensal</h3>
+  <div class="niveis" id="niveis"><div class="nivel"><b>Bronze</b><span>Até R$ 10.000</span><span>5% comissão</span><span>10% Bônus Look</span></div><div class="nivel"><b>Prata</b><span>Acima de R$ 10.000 até R$ 20.000</span><span>6% comissão</span><span>7% Bônus Look</span></div><div class="nivel"><b>Ouro</b><span>Acima de R$ 20.000</span><span>7% comissão</span><span>5% Bônus Look</span></div></div>
+  <p class="lead" style="margin:12px 0 0">O nível é calculado com as vendas de cada mês: quanto mais você vende, maior a sua comissão em dinheiro.</p>
 </div></section>
 
 <section id="como"><div class="in">
@@ -143,7 +152,7 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
     <li><h3>Marque a Flora Amar</h3><p>Marque o <a href="https://www.instagram.com/floraamaroficial/" target="_blank" rel="noopener">@floraamaroficial</a> em todos os posts relacionados às peças.</p></li>
     <li><h3>Receba seu cupom</h3><p>Com o vídeo de recebidos publicado, liberamos o seu cupom exclusivo de <span data-v="desconto">5%</span> OFF e você entra no grupo de afiliadas.</p></li>
     <li><h3>Produza e envie</h3><p>Produza <b>2 vídeos por mês</b> e envie para o WhatsApp do marketing: <b data-v="whatsMkt">(11) 92040-3050</b>.</p></li>
-    <li><h3>Venda e receba</h3><p>Divulgue o cupom nos seus conteúdos e stories. Todo mês você recebe <span data-v="credito">10%</span> do valor convertido em crédito look.</p></li>
+    <li><h3>Venda e receba</h3><p>Divulgue o cupom nos seus conteúdos e stories. Todo dia 01 o seu Bônus Look do mês anterior entra como crédito na sua conta da loja.</p></li>
   </ol>
   <div class="dica">Crie um destaque “Flora Amar” no seu Instagram para reunir todos os conteúdos da marca</div>
 </div></section>
@@ -171,11 +180,12 @@ footer{padding-block:30px 40px;color:var(--muted);font-size:13px}
     <li>Após publicar, envie os conteúdos para o WhatsApp da equipe de marketing: <b data-v="whatsMkt">(11) 92040-3050</b>.</li>
     <li>A Flora Amar não compartilha conteúdos que contenham o cupom de desconto. Sempre que quiser que a gente reposte, marque a marca sem divulgar o cupom.</li>
   </ul></details>
-  <details><summary>Cupom, comissão e crédito look</summary><ul>
+  <details><summary>Cupom, comissão e Bônus Look</summary><ul>
     <li>O cupom exclusivo dá <b data-v="desconto">5%</b> de desconto para as suas seguidoras e pode ser usado em outros conteúdos, stories e estratégias de divulgação.</li>
-    <li>Você recebe <b data-v="comissao">5%</b> de comissão sobre todas as vendas realizadas através do seu cupom, pelo programa de afiliados da plataforma da loja (wBuy).</li>
-    <li>O crédito look é de <b data-v="credito">10%</b> do valor convertido através do seu cupom, calculado e disponibilizado mensalmente para novas compras no site.</li>
-    <li>No total, o retorno é de <b data-v="total">15%</b> sobre as vendas geradas: <span data-v="comissao">5%</span> de comissão + <span data-v="credito">10%</span> em crédito look.</li>
+    <li>A comissão em dinheiro e o Bônus Look seguem o seu nível no mês: <b>Bronze</b> (até R$ 10.000) 5% + 10%, <b>Prata</b> (acima de R$ 10.000 até R$ 20.000) 6% + 7%, <b>Ouro</b> (acima de R$ 20.000) 7% + 5%.</li>
+    <li>O valor considerado é o dos produtos dos pedidos pagos com o seu cupom, sem o frete. Pedidos cancelados ou devolvidos não contam.</li>
+    <li>A comissão em dinheiro é paga pelo programa de afiliados da plataforma da loja (wBuy).</li>
+    <li>O Bônus Look do mês é calculado e lançado automaticamente como crédito na sua conta da loja todo dia 01, para usar em novas compras no site. Use no cadastro da loja o mesmo e-mail informado aqui.</li>
   </ul></details>
   <details><summary>Meta e permanência</summary><ul>
     <li>A afiliada deverá atingir uma meta mínima de <b data-v="meta">R$ 500</b> em vendas por mês através do seu cupom. Esse valor garante a permanência no programa.</li>
@@ -230,6 +240,9 @@ fetch("/api/config-publica").then(r=>r.json()).then(c=>{
   const set=(k,v)=>document.querySelectorAll(`[data-v="${k}"]`).forEach(e=>e.textContent=v);
   set("voucher",brl(c.voucherValor));set("desconto",c.desconto+"%");set("comissao",c.comissao+"%");set("credito",c.creditoLook+"%");set("total",(Number(c.comissao)+Number(c.creditoLook))+"%");
   set("prazo",c.prazoDias+" dias");set("validade",c.validadeVoucherDias+" dias");set("min",Number(c.minSeguidores).toLocaleString("pt-BR"));set("meta",brl(c.metaMensal));set("whatsMkt",c.whatsapp);
+  if(c.niveis){const f=n=>Number(n).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+    $("#niveis").innerHTML=c.niveis.map((n,i)=>`<div class="nivel"><b>${esc(n.nome)}</b><span>${i===0?"Até "+f(n.ate):n.ate?"Acima de "+f(n.de)+" até "+f(n.ate):"Acima de "+f(n.de)}</span><span>${n.comissao}% comissão</span><span>${n.bonus}% Bônus Look</span></div>`).join("");
+    const cs=c.niveis.map(n=>n.comissao);set("comMin",Math.min(...cs)+"%");set("comMax",Math.max(...cs)+"%");}
   $("#waLink").href="https://wa.me/55"+String(c.whatsapp).replace(/\D/g,"");
   if(!c.inscricoesAbertas){$("#formBody").innerHTML=`<div class="msg err">As inscrições estão fechadas no momento. Volte em breve!</div>`}
 }).catch(()=>{});
@@ -256,7 +269,8 @@ function renderStatus(s){
   if(s.voucher)h+=`<div class="codebox"><div><small>Voucher de ${brl(s.voucher.valor)} · válido até ${fmtD(s.voucher.validade)}</small><br><code>${esc(s.voucher.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.voucher.codigo)}">Copiar</button></div><a class="cta alt" href="https://www.floraamar.com.br/" target="_blank" rel="noopener">Escolher meus looks</a>`+(s.linkCadastro?`<a class="cta" href="${esc(s.linkCadastro)}">${s.cadastroPendente?"Completar meu cadastro e escolher meu cupom":"Ver ou corrigir meu cadastro"}</a>`:"");
   if(s.envio)h+=`<p>Envio: <b>${esc(s.envio.metodo||"")}</b>${s.envio.rastreio?` · rastreio <b>${esc(s.envio.rastreio)}</b>`:""}</p>`;
   if(s.prazoVideo)h+=`<p>Prazo para postar o vídeo de recebidos: <b>${fmtD(s.prazoVideo)}</b>. Lembre de marcar o @floraamaroficial e não divulgar cupom neste vídeo.</p><label>Link do vídeo publicado<input id="vLink" type="url" placeholder="https://www.instagram.com/reel/…" value="${esc(s.videoLink||"")}"></label><button type="button" class="cta" id="vEnviar">${s.videoLink?"Atualizar link":"Enviar link do vídeo"}</button>${s.videoLink?`<div class="msg ok">Link recebido. Vamos conferir e liberar seu cupom.</div>`:""}`;
-  if(s.cupom)h+=`<div class="codebox"><div><small>Seu cupom · ${s.cupom.desconto}% OFF para suas seguidoras · ${s.cupom.comissao}% de comissão + ${s.cupom.creditoLook ?? 10}% em crédito look</small><br><code>${esc(s.cupom.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.cupom.codigo)}">Copiar</button></div><p style="margin:0">Lembre: 2 vídeos por mês, enviados para o WhatsApp do marketing.</p>`;
+  if(s.mes)h+=`<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><small style="color:var(--muted)">Suas vendas em ${esc(s.mes.nome)}</small><div style="font-size:20px;font-weight:700">${brl(s.mes.total)} · nível ${esc(s.mes.nivel)}</div><small>${s.mes.qtd} pedido${s.mes.qtd!==1?"s":""} · Bônus Look previsto: ${brl(s.mes.bonusValor)} (${s.mes.bonusPct}%)${s.mes.proximo?" · faltam "+brl(s.mes.proximo.falta)+" para "+esc(s.mes.proximo.nome):""}</small>${s.mesAnterior?`<br><small style="color:var(--muted)">${esc(s.mesAnterior.nome)}: ${brl(s.mesAnterior.total)} · ${esc(s.mesAnterior.nivel)} · Bônus Look ${brl(s.mesAnterior.bonusValor)} ${s.mesAnterior.lancado?"creditado na sua conta":"em processamento"}</small>`:""}</div>`;
+  if(s.cupom)h+=`<div class="codebox"><div><small>Seu cupom · ${s.cupom.desconto}% OFF para suas seguidoras · comissão + Bônus Look conforme o seu nível</small><br><code>${esc(s.cupom.codigo)}</code></div><button type="button" class="small-btn" data-copy="${esc(s.cupom.codigo)}">Copiar</button></div><p style="margin:0">Lembre: 2 vídeos por mês, enviados para o WhatsApp do marketing.</p>`;
   h+=`<p style="color:var(--muted);font-size:13px;margin:0">Dúvidas: WhatsApp ${esc(s.whatsapp)}</p></div>`;
   $("#statusOut").innerHTML=h;
 }

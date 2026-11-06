@@ -98,6 +98,24 @@ ol.how{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;fon
 .note{font-size:12px;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
 [hidden]{display:none!important}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;padding:10px 14px;color:var(--muted)}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile b{font-size:24px;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile span{font-size:12px;color:var(--muted);font-weight:600}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table.v{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+table.v th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.v td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-variant-numeric:tabular-nums}
+table.v tr:last-child td{border-bottom:0}
+table.v td.n{text-align:right;white-space:nowrap}
+table.v th.n{text-align:right}
+.nv{display:inline-flex;border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:700}
+.nv.Bronze{background:#f1e2d3;color:#8a5a2b}.nv.Prata{background:#e6e8ea;color:#4c5660}.nv.Ouro{background:#f7ecc6;color:#8a6a00}
+.vbar{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px}.vbar i{display:block;height:100%;background:var(--accent)}
 a.btn{display:inline-flex;align-items:center}
 </style>
 </head><body>
@@ -111,6 +129,9 @@ a.btn{display:inline-flex;align-items:center}
       <button id="btnSair" class="ghost small">Sair</button>
     </div>
   </header>
+  <nav class="tabs" role="tablist"><button class="tab on" data-tab="afiliadas" role="tab">Afiliadas</button><button class="tab" data-tab="vendas" role="tab">Vendas e Bônus Look</button></nav>
+  <div id="vendasView" hidden></div>
+  <div id="afiliadasView" style="display:flex;flex-direction:column;gap:22px">
   <div class="terms" id="terms"></div>
   <div id="alertBox" hidden></div>
   <nav class="funnel" id="funnel" aria-label="Etapas"></nav>
@@ -120,6 +141,7 @@ a.btn{display:inline-flex;align-items:center}
   </div>
   <div id="status" class="status">Carregando afiliadas…</div>
   <div id="list" class="list"></div>
+  </div>
 </div>
 <div class="wrap" id="login" hidden style="max-width:420px;padding-top:12vh">
   <div class="brand"><small>Flora Amar</small><h1>Painel de <em>afiliadas</em></h1></div>
@@ -140,7 +162,10 @@ const ETAPAS=[
   {k:"recusada",l:"Recusadas",s:"–",next:""}
 ];
 const IDX=Object.fromEntries(ETAPAS.map((e,i)=>[e.k,i]));
-const DEF={voucherValor:500,desconto:5,comissao:5,prazoDias:15,validadeVoucherDias:30,minSeguidores:1000,creditoLook:10,metaMensal:500,whatsapp:"(11) 92040-3050",inscricoesAbertas:true};
+const DEF={voucherValor:500,desconto:5,comissao:5,prazoDias:15,validadeVoucherDias:30,minSeguidores:1000,creditoLook:10,metaMensal:500,whatsapp:"(11) 92040-3050",inscricoesAbertas:true,nivel1Ate:10000,nivel1Comissao:5,nivel1Bonus:10,nivel2Ate:20000,nivel2Comissao:6,nivel2Bonus:7,nivel3Comissao:7,nivel3Bonus:5,autoFechamento:true};
+function nivelDe(t){if(t>cfg.nivel2Ate)return{nome:"Ouro",comissao:cfg.nivel3Comissao,bonus:cfg.nivel3Bonus,proximo:null};if(t>cfg.nivel1Ate)return{nome:"Prata",comissao:cfg.nivel2Comissao,bonus:cfg.nivel2Bonus,proximo:{nome:"Ouro",falta:cfg.nivel2Ate-t}};return{nome:"Bronze",comissao:cfg.nivel1Comissao,bonus:cfg.nivel1Bonus,proximo:{nome:"Prata",falta:cfg.nivel1Ate-t}}}
+const INVALIDOS=new Set(["1","2","6","8","10","11"]);
+const vendaConta=v=>v.statusId?!INVALIDOS.has(String(v.statusId)):!/cancel|devolv|estorn|recus|negad|aguard|análise|analise/i.test(v.status||"");
 let cfg={...DEF}, rows=[], filtro=null, aberta=null, draft=null;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -176,7 +201,7 @@ function prazoInfo(r){
   return {cls:"a",t:`Vídeo até ${fmtD(r.prazoVideo)}`};
 }
 function renderTop(){
-  $("#terms").innerHTML=`<span>Voucher <b>${brl(cfg.voucherValor)}</b></span><span>Desconto clientes <b>${cfg.desconto}%</b></span><span>Comissão <b>${cfg.comissao}%</b></span><span>Crédito look <b>${cfg.creditoLook}%</b></span><span>Meta <b>${brl(cfg.metaMensal)}</b>/mês</span><span>Vídeo em <b>${cfg.prazoDias} dias</b></span><span>Mínimo <b>${Number(cfg.minSeguidores).toLocaleString("pt-BR")}</b> seguidores</span><span>Inscrições <b>${cfg.inscricoesAbertas?"abertas":"fechadas"}</b></span>`;
+  $("#terms").innerHTML=`<span>Voucher <b>${brl(cfg.voucherValor)}</b></span><span>Desconto clientes <b>${cfg.desconto}%</b></span><span>Níveis <b>${cfg.nivel1Comissao}–${cfg.nivel3Comissao}%</b> comissão · <b>${cfg.nivel3Bonus}–${cfg.nivel1Bonus}%</b> Bônus Look</span><span>Meta <b>${brl(cfg.metaMensal)}</b>/mês</span><span>Vídeo em <b>${cfg.prazoDias} dias</b></span><span>Mínimo <b>${Number(cfg.minSeguidores).toLocaleString("pt-BR")}</b> seguidores</span><span>Inscrições <b>${cfg.inscricoesAbertas?"abertas":"fechadas"}</b></span>`;
   const cont=Object.fromEntries(ETAPAS.map(e=>[e.k,0]));rows.forEach(r=>cont[r.etapa]=(cont[r.etapa]||0)+1);
   $("#funnel").innerHTML=ETAPAS.map(e=>`<button class="stage ${filtro===e.k?"on":""}" data-k="${e.k}" aria-pressed="${filtro===e.k}"><span class="s">${e.s}</span><span class="n">${cont[e.k]}</span><span class="l">${e.l}</span></button>`).join("");
   const atras=rows.filter(r=>r.etapa==="entregue"&&r.prazoVideo&&!r.videoLink&&diasAte(r.prazoVideo)<0);
@@ -219,15 +244,15 @@ function msgs(r){
     aprovadaEmail:`Oi, ${n}! 🌸\n\nSua inscrição no Programa de Afiliadas Flora Amar foi APROVADA!\n\n1) COMPLETE SEU CADASTRO E ESCOLHA O NOME DO SEU CUPOM\nPreencha seus dados para o cadastro de afiliada e o recebimento da comissão neste link:\n${linkCad(r)}\n\n2) ESCOLHA SEUS LOOKS\nVocê ganhou um voucher de ${brl(r.voucher?.valor??cfg.voucherValor)} para escolher seus looks em www.floraamar.com.br\nSeu código: ${r.voucher?.codigo||""} (válido até ${fmtD(r.voucher?.validade)})\n\n3) CONTEÚDO DE RECEBIDOS\nDepois que os looks chegarem, você tem ${r.prazoDias??cfg.prazoDias} dias para postar o seu conteúdo de recebidos marcando o @floraamaroficial (sem divulgar cupom nesse vídeo). Quando postar, envie o link em ${site}/#acompanhar com o protocolo ${r.protocolo||""}.\n\nAssim que o vídeo for publicado, ativamos o seu cupom exclusivo e você entra no grupo de afiliadas.\n\nQualquer dúvida, fale com a equipe no WhatsApp ${cfg.whatsapp}.\n\nCom carinho,\nEquipe Flora Amar`,
     entregue:`Oi, ${n}! Seus looks Flora Amar chegaram 💐\n\nO conteúdo de recebidos vai até ${fmtD(r.prazoVideo)}. Quando postar, envie o link em ${site}/#acompanhar (protocolo ${r.protocolo||""}) para liberarmos seu cupom de afiliada. 😊`,
     cobranca:`Oi, ${n}! Tudo bem? Passando para lembrar do vídeo com os looks Flora Amar, o prazo era ${fmtD(r.prazoVideo)}. Consegue postar nos próximos dias? Assim já libero seu cupom de afiliada com comissão. 💕`,
-    ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe ${r.cupom?.comissao??cfg.comissao}% de comissão + ${r.cupom?.creditoLook??cfg.creditoLook}% em crédito look por mês sobre as vendas com ele.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
+    ativa:`${n}, seu vídeo ficou lindo! Obrigada 🌸\n\nSeu cupom de afiliada está ATIVO:\nCupom: ${r.cupom?.codigo||""}\nSuas seguidoras ganham ${r.cupom?.desconto??cfg.desconto}% de desconto em www.floraamar.com.br. Você recebe comissão em dinheiro + Bônus Look todo mês sobre as vendas com ele, conforme o seu nível: Bronze (até ${brl(cfg.nivel1Ate)}/mês) ${cfg.nivel1Comissao}% + ${cfg.nivel1Bonus}% · Prata (até ${brl(cfg.nivel2Ate)}) ${cfg.nivel2Comissao}% + ${cfg.nivel2Bonus}% · Ouro (acima de ${brl(cfg.nivel2Ate)}) ${cfg.nivel3Comissao}% + ${cfg.nivel3Bonus}%. O Bônus Look entra como crédito na sua conta da loja todo dia 01.\n\nCombinados: 2 vídeos por mês enviados para o WhatsApp do marketing ${cfg.whatsapp}, marcar o @floraamaroficial e meta mínima de ${brl(cfg.metaMensal)} em vendas por mês. Você já vai entrar no nosso grupo de afiliadas! ✨`,
     recusada:`Oi, ${n}! Obrigada pelo interesse no programa de afiliadas Flora Amar 🌸 Desta vez seu perfil não se encaixou no que buscamos, mas seguimos juntas por lá!`
   };
 }
 function resumoVendas(r){
-  const ym=hoje().slice(0,7);const vs=Object.entries(r.vendas||{}).map(([id,v])=>({id,...v})).filter(v=>!/cancel|devolv|estorn|recus/i.test(v.status||""));
+  const ym=hoje().slice(0,7);const vs=Object.entries(r.vendas||{}).map(([id,v])=>({id,...v})).filter(vendaConta);
   const mes=vs.filter(v=>(v.em||"").slice(0,7)===ym);const tot=mes.reduce((a,v)=>a+(Number(v.total)||0),0);
-  const pct=Math.min(100,Math.round(tot/(cfg.metaMensal||1)*100));
-  return {mes,tot,pct,todas:vs,txt:`${mes.length} venda${mes.length!==1?"s":""} no mês · ${brl(tot)}`};
+  const pct=Math.min(100,Math.round(tot/(cfg.metaMensal||1)*100));const nv=nivelDe(tot);
+  return {mes,tot,pct,todas:vs,nv,txt:`${nv.nome} · ${mes.length} venda${mes.length!==1?"s":""} no mês · ${brl(tot)}`};
 }
 const linkCad=r=>r.protocolo&&r.tokenCadastro?`${location.origin}/cadastro?p=${r.protocolo}&t=${r.tokenCadastro}`:"(salve a ficha para gerar o link)";
 const fmtCpf=c=>String(c||"").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
@@ -278,12 +303,14 @@ function renderDrawer(){
     <ol class="how"><li>wBuy → Afiliados → Novo afiliado: use os dados acima, Código <b>${esc(r.cupom?.codigo)}</b>, e marque “Personalizar comissão” com <b>${r.cupom?.comissao}%</b> se o grupo não tiver esse valor</li><li>Criar o cupom <b>${esc(r.cupom?.codigo)}</b> com <b>${r.cupom?.desconto}%</b> de desconto, sem limite de uso</li><li>Vincular o cupom à afiliada, para a comissão contar nas vendas</li></ol>
     <p class="note">Os nomes dos menus podem variar conforme a versão da sua wBuy.</p>
     ${chk("cupom.afiliadaCadastrada","Afiliada cadastrada no módulo de afiliados da wBuy")}${chk("cupom.cadastradoWbuy","Cupom criado e vinculado à afiliada")}${chk("cupom.grupo","Adicionada ao grupo de afiliadas no WhatsApp")}</div>`;
-    if(r.etapa==="ativa"){const v=resumoVendas(r);const cl=r.cupom?.creditoLook??cfg.creditoLook,cm=r.cupom?.comissao??cfg.comissao;
-      h+=`<div class="box focus"><div class="kv"><h4>Vendas com o cupom · ${new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</h4><span class="pill ${v.tot>=cfg.metaMensal?"ok":"warn"}">${v.tot>=cfg.metaMensal?"Meta batida":"Meta: "+v.pct+"%"}</span></div>
+    if(r.etapa==="ativa"){const v=resumoVendas(r);const cl=v.nv.bonus,cm=v.nv.comissao;
+      h+=`<div class="box focus"><div class="kv"><h4>Vendas com o cupom · ${new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</h4><span style="display:flex;gap:6px"><span class="nv ${v.nv.nome}">${v.nv.nome}</span><span class="pill ${v.tot>=cfg.metaMensal?"ok":"warn"}">${v.tot>=cfg.metaMensal?"Meta batida":"Meta: "+v.pct+"%"}</span></span></div>
+      ${v.nv.proximo?`<p class="note" style="margin:0">Faltam ${brl(v.nv.proximo.falta)} em vendas para o nível ${v.nv.proximo.nome}.</p>`:""}
       <div class="steps"><span class="done" style="flex:${v.pct||0.01}"></span><span style="flex:${100-v.pct||0.01}"></span></div>
       <div class="kv"><span>Vendas no mês</span><span class="v">${v.mes.length} · ${brl(v.tot)}</span></div>
       <div class="kv"><span>Comissão (${cm}%)</span><span class="v">${brl(v.tot*cm/100)}</span></div>
-      <div class="kv"><span>Crédito look a liberar (${cl}%)</span><span class="v">${brl(v.tot*cl/100)}</span></div>
+      <div class="kv"><span>Bônus Look do mês (${cl}%)</span><span class="v">${brl(v.tot*cl/100)}</span></div>
+      ${Object.values(r.fechamentos||{}).sort((a,b)=>b.mes.localeCompare(a.mes)).slice(0,6).map(f=>`<div class="kv"><span>${esc(f.mes.split("-").reverse().join("/"))} · <span class="nv ${f.nivel}">${f.nivel}</span></span><span class="v">${brl(f.total)} → Bônus ${brl(f.bonusValor)} ${f.creditoLancado?"✓ lançado":f.erro?"· erro":"· pendente"}</span></div>`).join("")}
       <div class="kv"><span>Total desde a ativação</span><span class="v">${v.todas.length} venda${v.todas.length!==1?"s":""} · ${brl(v.todas.reduce((a,x)=>a+(Number(x.total)||0),0))}</span></div>
       ${v.mes.length?`<div class="hist">${v.mes.slice(-8).reverse().map(x=>`<span>Pedido ${esc(x.id)} · ${x.total!=null?brl(x.total):"valor não informado"}${x.status?" · "+esc(x.status):""}</span>`).join("")}</div>`:`<p class="note" style="margin:0">As vendas aparecem aqui sozinhas quando a wBuy avisar um pedido com o cupom ${esc(r.cupom?.codigo)}.</p>`}</div>`;}
     if(r.etapa==="ativa"||r.etapa==="video"){h+=blocoEmail("E-mail do cupom ativo","Seu cupom de afiliada Flora Amar está ativo ✨",M.ativa,r.dadosWbuy?.email||r.email);h+=blocoMsg("Mensagem do cupom ativo (WhatsApp)",M.ativa,W);}
@@ -338,12 +365,47 @@ async function enviarEmail(t){
   try{await api("POST","/api/admin/email",{para,assunto,texto});lerCampos();hist(`E-mail enviado: ${assunto}`);await salvar("E-mail enviado para "+para);renderDrawer()}
   catch(e){if(e.message!=="login")toast(e.message);t.disabled=false;t.textContent="Enviar e-mail"}
 }
+/* ---------- vendas e bônus ---------- */
+let vendasMes=null,vendasDados=null,confirmFech=false;
+const fmtMes=m=>{const [a,b]=m.split("-").map(Number);return new Date(a,b-1,15).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})};
+function mesesOpcoes(){const out=[];const [a,b]=hoje().slice(0,7).split("-").map(Number);for(let i=0;i<12;i++){const d=new Date(a,b-1-i,15);out.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}return out}
+async function carregarVendas(){
+  vendasMes=vendasMes||hoje().slice(0,7);$("#vendasView").innerHTML=`<p class="status">Carregando vendas…</p>`;
+  try{vendasDados=await api("GET","/api/admin/vendas?mes="+vendasMes);renderVendas()}catch(e){if(e.message!=="login")$("#vendasView").innerHTML=`<div class="alert">Não foi possível carregar as vendas: ${esc(e.message)}</div>`}
+}
+function renderVendas(){
+  const d=vendasDados;if(!d)return;const passado=d.mes<d.mesAtual;const L=d.linhas;
+  const tot=L.reduce((a,l)=>a+l.total,0),bon=L.reduce((a,l)=>a+(l.fechamento?.creditoLancado?l.fechamento.bonusValor:l.bonusValor),0),com=L.reduce((a,l)=>a+l.comissaoValor,0),meta=L.filter(l=>l.metaOk).length;
+  const f=d.fechamento;
+  let h=`<div class="toolbar" style="justify-content:space-between"><label class="f" style="flex-direction:row;align-items:center;gap:8px">Mês<select id="vMes" style="width:auto">${mesesOpcoes().map(m=>`<option value="${m}" ${m===d.mes?"selected":""}>${fmtMes(m)}${m===d.mesAtual?" (atual)":""}</option>`).join("")}</select></label>
+  <div class="btnrow">${d.api?`<button id="vSync">Atualizar vendas da wBuy</button>`:""}${passado&&d.api?`<button class="primary" id="vFechar">${f?.concluido?"Lançar pendentes":"Fechar mês e lançar Bônus Look"}</button>`:""}${passado?`<button class="ghost small" id="vCalc">Recalcular sem lançar</button>`:""}</div></div>`;
+  if(confirmFech)h+=`<div class="alert" style="background:var(--warn-soft);color:var(--warn)">Lançar o Bônus Look de ${fmtMes(d.mes)} como crédito na conta de cada afiliada na loja? Total: ${brl(L.filter(l=>!l.fechamento?.creditoLancado).reduce((a,l)=>a+l.bonusValor,0))}. <button class="small primary" id="vFecharSim">Sim, lançar</button><button class="small" id="vFecharNao">Cancelar</button></div>`;
+  if(!d.api)h+=`<div class="box"><div class="kv"><h4>Conectar a API da wBuy</h4><span class="pill warn">Não conectada</span></div><p class="note" style="margin:0">Com a API, o painel busca todas as vendas com os cupons e, todo dia 01, lança o Bônus Look do mês anterior como crédito na conta da afiliada na loja. Sem ela, as vendas vêm só pelos avisos (webhook) e o lançamento é manual.</p><ol class="how"><li>wBuy → <b>Plataforma → API e webhooks → Opções → Integração API REST</b>: crie um usuário e senha de API</li><li>No Render, no serviço <b>flora-afiliadas</b> → <b>Environment</b>, adicione <b>WBUY_API_USER</b>, <b>WBUY_API_PASS</b> e <b>WBUY_CONTACT</b> (seu e-mail)</li><li>Clique em <b>Save, rebuild and deploy</b></li></ol></div>`;
+  h+=`<div class="tiles"><div class="tile"><span>Vendas com cupons</span><b>${brl(tot)}</b><span>${L.reduce((a,l)=>a+l.qtd,0)} pedidos</span></div><div class="tile"><span>Comissão em dinheiro</span><b>${brl(com)}</b><span>a pagar às afiliadas</span></div><div class="tile"><span>Bônus Look</span><b>${brl(bon)}</b><span>${passado?(f?.lancado?"lançado em "+new Date(f.em).toLocaleDateString("pt-BR"):"a lançar"):"previsto para dia 01"}</span></div><div class="tile"><span>Meta de ${brl(cfg.metaMensal)}</span><b>${meta}/${L.length}</b><span>afiliadas bateram</span></div></div>`;
+  h+=`<p class="note" style="margin:0">${d.sync?`Vendas buscadas na wBuy em ${new Date(d.sync.em).toLocaleString("pt-BR")} · `:""}Conta o valor dos produtos (sem frete) de pedidos pagos, em andamento ou concluídos. Pedidos aguardando pagamento, cancelados, negados ou devolvidos não entram. Níveis: <span class="nv Bronze">Bronze</span> até ${brl(cfg.nivel1Ate)} · ${cfg.nivel1Comissao}% + ${cfg.nivel1Bonus}% · <span class="nv Prata">Prata</span> até ${brl(cfg.nivel2Ate)} · ${cfg.nivel2Comissao}% + ${cfg.nivel2Bonus}% · <span class="nv Ouro">Ouro</span> acima · ${cfg.nivel3Comissao}% + ${cfg.nivel3Bonus}%</p>`;
+  h+=L.length?`<div class="tbl-wrap"><table class="v"><thead><tr><th>Afiliada</th><th class="n">Pedidos</th><th class="n">Vendas</th><th>Nível</th><th class="n">Comissão</th><th class="n">Bônus Look</th><th>Meta</th><th>Crédito na loja</th></tr></thead><tbody>${L.map(l=>{const fz=l.fechamento;const pctN=l.proximo?Math.min(100,Math.round(l.total/(l.total+l.proximo.falta)*100)):100;
+    return `<tr><td><b>${esc(l.nome)}</b><br><span class="code">${esc(l.cupom||"sem cupom")}</span></td><td class="n">${l.qtd}${l.pendentes?`<br><span class="note">+${l.pendentes} pendente${l.pendentes>1?"s":""}</span>`:""}</td><td class="n"><b>${brl(l.total)}</b></td><td><span class="nv ${l.nivel}">${l.nivel}</span><div class="vbar"><i style="width:${pctN}%"></i></div><span class="note">${l.proximo?"faltam "+brl(l.proximo.falta)+" p/ "+l.proximo.nome:"nível máximo"}</span></td><td class="n">${brl(l.comissaoValor)}<br><span class="note">${l.comissaoPct}%</span></td><td class="n"><b>${brl(fz?.creditoLancado?fz.bonusValor:l.bonusValor)}</b><br><span class="note">${l.bonusPct}%</span></td><td>${l.metaOk?`<span class="pill ok">Batida</span>`:`<span class="pill warn">${Math.round(l.total/cfg.metaMensal*100)}%</span>`}</td><td>${fz?.creditoLancado?`<span class="pill ok">Lançado ${new Date(fz.creditoEm).toLocaleDateString("pt-BR")}</span> <button class="small ghost" data-desfazer="${esc(l.id)}">Desfazer</button>`:fz?.erro?`<span class="pill bad" title="${esc(fz.erro)}">Erro</span><br><span class="note">${esc(fz.erro)}</span>`:passado?(l.bonusValor>0?`<span class="pill warn">Pendente</span>`:`<span class="note">sem bônus</span>`):`<span class="note">dia 01</span>`}</td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty"><p>Nenhuma venda com cupom de afiliada em ${fmtMes(d.mes)}.</p></div>`;
+  $("#vendasView").innerHTML=h;
+}
+async function acaoVendas(t){
+  try{
+    if(t.id==="vSync"){t.disabled=true;t.textContent="Buscando na wBuy…";const r=await api("POST","/api/admin/vendas/sync",{mes:vendasMes});toast(`${r.lidos} pedidos lidos · ${r.achados} com cupom de afiliada`);await carregarVendas();await carregar()}
+    if(t.id==="vCalc"){t.disabled=true;await api("POST","/api/admin/fechamento",{mes:vendasMes,lancar:false});toast("Mês recalculado");await carregarVendas()}
+    if(t.id==="vFechar"){confirmFech=true;renderVendas()}
+    if(t.id==="vFecharNao"){confirmFech=false;renderVendas()}
+    if(t.id==="vFecharSim"){confirmFech=false;t.disabled=true;t.textContent="Lançando…";const r=await api("POST","/api/admin/fechamento",{mes:vendasMes,lancar:true});toast(r.erros?`Lançado com ${r.erros} erro(s). Veja a tabela.`:`Bônus Look lançado: ${brl(r.totalBonus)}`);await carregarVendas()}
+    if(t.dataset.desfazer){t.disabled=true;await api("POST","/api/admin/fechamento/desfazer",{id:t.dataset.desfazer,mes:vendasMes});toast("Crédito estornado");await carregarVendas()}
+  }catch(e){if(e.message!=="login")toast(e.message);t.disabled=false}
+}
 function novaAfiliada(){aberta="__novo";draft={etapa:"proposta"};renderDrawer()}
 function abrirConfig(){
   aberta="__config";draft=null;const n=(k,l,extra="")=>`<label class="f">${l}<input id="cfg-${k}" type="number" min="0" value="${esc(cfg[k])}" ${extra}></label>`;
   $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Regras"><div class="dhead"><h2>Regras do programa</h2><button class="ghost small" id="fechar">Fechar</button></div>
-  <div class="box"><div class="grid2">${n("voucherValor","Valor do voucher (R$)")}${n("validadeVoucherDias","Validade do voucher (dias)")}${n("desconto","Desconto para clientes (%)")}${n("comissao","Comissão da afiliada (%)")}${n("prazoDias","Prazo do vídeo após entrega (dias)")}${n("minSeguidores","Mínimo de seguidores")}${n("creditoLook","Crédito look (%)")}${n("metaMensal","Meta mínima de vendas por mês (R$)")}
+  <div class="box"><div class="grid2">${n("voucherValor","Valor do voucher (R$)")}${n("validadeVoucherDias","Validade do voucher (dias)")}${n("desconto","Desconto para clientes (%)")}${n("prazoDias","Prazo do vídeo após entrega (dias)")}${n("minSeguidores","Mínimo de seguidores")}${n("metaMensal","Meta mínima de vendas por mês (R$)")}
   <label class="f">WhatsApp do marketing (aparece na página)<input id="cfg-whatsapp" value="${esc(cfg.whatsapp)}"></label></div>
+  <h4 style="margin:6px 0 0">Níveis por conversão mensal</h4>
+  <div class="grid2">${n("nivel1Ate","Bronze: até (R$)")}<span></span>${n("nivel1Comissao","Bronze: comissão (%)")}${n("nivel1Bonus","Bronze: Bônus Look (%)")}${n("nivel2Ate","Prata: até (R$)")}<span></span>${n("nivel2Comissao","Prata: comissão (%)")}${n("nivel2Bonus","Prata: Bônus Look (%)")}${n("nivel3Comissao","Ouro: comissão (%)")}${n("nivel3Bonus","Ouro: Bônus Look (%)")}</div>
+  <label class="check"><input type="checkbox" id="cfg-autoFechamento" ${cfg.autoFechamento?"checked":""}><span>Todo dia 01, fechar o mês anterior e lançar o Bônus Look como crédito na conta da afiliada na loja</span></label>
   <label class="check"><input type="checkbox" id="cfg-inscricoesAbertas" ${cfg.inscricoesAbertas?"checked":""}><span>Inscrições abertas na página pública</span></label>
   <p class="note">Os valores aparecem na página pública e nas políticas. Afiliadas já aprovadas mantêm o que foi combinado.</p>
   <div class="btnrow"><button class="primary" id="cfgSalvar">Salvar regras</button></div></div>
@@ -355,7 +417,7 @@ function abrirConfig(){
   <p class="note" style="margin:0">Guarde este endereço só para a wBuy: quem tiver ele consegue enviar avisos falsos.</p></div></aside>`;
 }
 async function salvarConfig(){
-  const n={};Object.keys(DEF).forEach(k=>{const el=$("#cfg-"+k);n[k]=el.type==="checkbox"?el.checked:el.type==="number"?Number(el.value):el.value});
+  const n={};Object.keys(DEF).forEach(k=>{const el=$("#cfg-"+k);if(!el){n[k]=cfg[k];return}n[k]=el.type==="checkbox"?el.checked:el.type==="number"?Number(el.value):el.value});
   try{cfg={...DEF,...await api("PUT","/api/admin/config",n)};renderTop();renderList();toast("Regras salvas");fechar()}catch(e){toast("Não foi possível salvar")}
 }
 document.addEventListener("click",async e=>{
@@ -373,9 +435,12 @@ document.addEventListener("click",async e=>{
   if(t.id==="btnNova")novaAfiliada();
   if(t.id==="btnConfig")abrirConfig();
   if(t.id==="cfgSalvar")salvarConfig();
+  if(t.dataset.tab){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));const v=t.dataset.tab==="vendas";$("#vendasView").hidden=!v;$("#afiliadasView").hidden=v;$("#vendasView").style.display=v?"flex":"";$("#vendasView").style.flexDirection="column";$("#vendasView").style.gap="16px";if(v)carregarVendas();return}
+  if(["vSync","vCalc","vFechar","vFecharNao","vFecharSim"].includes(t.id)||t.dataset.desfazer){acaoVendas(t);return}
   if(t.id==="btnSair"){await fetch("/api/logout",{method:"POST"});mostrarLogin()}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&aberta)fechar()});
+document.addEventListener("change",e=>{if(e.target.id==="vMes"){vendasMes=e.target.value;confirmFech=false;carregarVendas()}});
 $("#busca").addEventListener("input",renderList);$("#ordem").addEventListener("change",renderList);
 carregar();
 setInterval(()=>{if(!aberta&&!document.hidden&&!$("#app").hidden)carregar()},60000);
