@@ -289,6 +289,12 @@ function renderDrawer(){
     if(r.etapa==="ativa"||r.etapa==="video"){h+=blocoEmail("E-mail do cupom ativo","Seu cupom de afiliada Flora Amar está ativo ✨",M.ativa,r.dadosWbuy?.email||r.email);h+=blocoMsg("Mensagem do cupom ativo (WhatsApp)",M.ativa,W);}
   }
   if(r.etapa==="recusada")h+=blocoMsg("Mensagem de resposta",M.recusada,W);
+  if(!novo&&r.etapa!=="recusada"&&i>=1){
+    const outras=[];
+    if(r.etapa!=="aprovada"){outras.push(["E-mail de aprovação",blocoEmail("E-mail de aprovação","Você foi aprovada no Programa de Afiliadas Flora Amar 🌸",M.aprovadaEmail,r.email)]);outras.push(["Aprovação (WhatsApp)",blocoMsg("Mensagem de aprovação (WhatsApp)",M.aprovada,W)]);}
+    if(i>=4&&!(r.etapa==="entregue"&&!r.videoLink)){outras.push(["Aviso de prazo do vídeo",blocoMsg("Aviso de prazo do vídeo",M.entregue,W)]);outras.push(["Cobrança do vídeo",blocoMsg("Cobrança do vídeo",M.cobranca,W)]);}
+    if(outras.length)h+=`<details class="box"><summary style="cursor:pointer;font-weight:700">Outras mensagens para a afiliada (${outras.length})</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">${outras.map(o=>o[1]).join("")}</div></details>`;
+  }
   h+=`<div class="box">${campo("notas","Anotações internas","textarea")}${(r.historico||[]).length?`<div class="hist">${r.historico.slice().reverse().map(x=>`<span>${fmtD(x.em)} · ${esc(x.t)}</span>`).join("")}</div>`:""}</div>`;
   const acoes={proposta:[["aprovar","Aprovar e gerar voucher","primary"],["recusar","Recusar","danger"]],aprovada:[["compra","Compra feita","primary"]],compra:[["enviado","Marcar looks enviados","primary"]],enviado:[["entregue","Confirmar entrega e iniciar prazo","primary"]],entregue:[["video","Vídeo conferido, gerar cupom","primary"]],video:[["ativa","Ativar afiliada","primary"]],ativa:[],recusada:[["reabrir","Reabrir inscrição",""]]};
   h+=`<div class="btnrow">${novo?`<button class="primary" data-act="criar">Salvar afiliada</button>`:`${(acoes[r.etapa]||[]).map(a=>`<button class="${a[2]}" data-act="${a[0]}">${a[1]}</button>`).join("")}<button data-act="salvar">Salvar alterações</button>${i>0&&r.etapa!=="recusada"?`<button class="ghost small" data-act="voltar">Voltar etapa</button>`:""}<button class="ghost small danger" data-act="excluir">Excluir</button>`}</div><div id="confirmBox"></div>`;
