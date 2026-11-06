@@ -24,7 +24,7 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 const EMAIL_FROM = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `Flora Amar <${process.env.SMTP_USER}>` : "");
 const DEFAULT_CONFIG = { voucherValor: 500, desconto: 5, comissao: 5, prazoDias: 15, validadeVoucherDias: 30, minSeguidores: 1000, creditoLook: 10, metaMensal: 500, whatsapp: "(11) 92040-3050", inscricoesAbertas: true,
   nivel1Ate: 10000, nivel1Comissao: 5, nivel1Bonus: 10, nivel2Ate: 20000, nivel2Comissao: 6, nivel2Bonus: 7, nivel3Comissao: 7, nivel3Bonus: 5,
-  autoFechamento: true };
+  autoFechamento: true, manterOuro: true };
 // níveis por conversão mensal (Bronze, Prata, Ouro)
 function nivelDe(total, c) {
   if (total > c.nivel2Ate) return { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null };
@@ -149,7 +149,7 @@ function viewPublica(r, c) {
   if (r.etapa === "aprovada") { v.cadastroPendente = !r.dadosWbuy; v.linkCadastro = `/cadastro?p=${r.protocolo}&t=${tokenCadastro(r.protocolo)}`; }
   if (["enviado"].includes(r.etapa)) v.envio = { metodo: r.envioMetodo, rastreio: r.rastreio };
   if (r.etapa === "entregue") { v.prazoVideo = r.prazoVideo; v.videoLink = r.videoLink || ""; }
-  if (r.etapa === "ativa") { const rs = resumoMes(r, mesAtual(), c); v.mes = { nome: nomeMes(mesAtual()), total: rs.total, qtd: rs.qtd, nivel: rs.nivel, bonusPct: rs.bonusPct, comissaoPct: rs.comissaoPct, bonusValor: rs.bonusValor, proximo: rs.proximo }; const fa = r.fechamentos?.[mesAnterior()]; if (fa) v.mesAnterior = { nome: nomeMes(mesAnterior()), total: fa.total, nivel: fa.nivel, bonusValor: fa.bonusValor, lancado: !!fa.creditoLancado }; }
+  if (r.etapa === "ativa") { const rs = resumoMes(r, mesAtual(), c); v.mes = { nome: nomeMes(mesAtual()), total: rs.total, qtd: rs.qtd, nivel: rs.nivel, mantido: rs.mantido, bonusPct: rs.bonusPct, comissaoPct: rs.comissaoPct, bonusValor: rs.bonusValor, proximo: rs.proximo }; const fa = r.fechamentos?.[mesAnterior()]; if (fa) v.mesAnterior = { nome: nomeMes(mesAnterior()), total: fa.total, nivel: fa.nivel, bonusValor: fa.bonusValor, lancado: !!fa.creditoLancado }; }
   if (r.etapa === "ativa" && r.cupom) v.cupom = { codigo: r.cupom.codigo, desconto: r.cupom.desconto, comissao: r.cupom.comissao, creditoLook: r.cupom.creditoLook ?? c.creditoLook };
   return v;
 }
@@ -352,8 +352,15 @@ function resumoMes(r, mes, c) {
   const vs = Object.entries(r.vendas || {}).map(([id, v]) => ({ id, ...v })).filter(v => String(v.em || "").slice(0, 7) === mes);
   const validas = vs.filter(vendaConta);
   const total = r2(validas.reduce((a, v) => a + (Number(v.total) || 0), 0));
-  const nv = nivelDe(total, c);
-  return { total, qtd: validas.length, pendentes: vs.length - validas.length, nivel: nv.nome, comissaoPct: nv.comissao, bonusPct: nv.bonus, comissaoValor: r2(total * nv.comissao / 100), bonusValor: r2(total * nv.bonus / 100), proximo: nv.proximo, metaOk: total >= c.metaMensal, vendas: vs.sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 50) };
+  let nv = nivelDe(total, c), mantido = "";
+  // quem foi Ouro pelas próprias vendas no mês anterior continua Ouro neste mês
+  if (c.manterOuro && nv.nome !== "Ouro") {
+    const ant = mesAnterior(mes);
+    let totAnt = r2(Object.values(r.vendas || {}).filter(v => String(v.em || "").slice(0, 7) === ant && vendaConta(v)).reduce((a, v) => a + (Number(v.total) || 0), 0));
+    if (!totAnt && r.fechamentos?.[ant]?.total) totAnt = r.fechamentos[ant].total;
+    if (nivelDe(totAnt, c).nome === "Ouro") { nv = { nome: "Ouro", comissao: c.nivel3Comissao, bonus: c.nivel3Bonus, proximo: null }; mantido = nomeMes(ant); }
+  }
+  return { total, mantido, qtd: validas.length, pendentes: vs.length - validas.length, nivel: nv.nome, comissaoPct: nv.comissao, bonusPct: nv.bonus, comissaoValor: r2(total * nv.comissao / 100), bonusValor: r2(total * nv.bonus / 100), proximo: nv.proximo, metaOk: total >= c.metaMensal, vendas: vs.sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, 50) };
 }
 async function acharClienteWbuy(r) {
   const emails = [r.dadosWbuy?.emailLoja, r.dadosWbuy?.email, r.email].filter(Boolean).map(e => e.toLowerCase());
@@ -379,7 +386,7 @@ async function fecharMes(mes, lancar) {
       const rs = resumoMes(r, mes, c);
       r.fechamentos = r.fechamentos || {};
       const ant = r.fechamentos[mes] || {};
-      const f = { ...ant, mes, total: rs.total, qtd: rs.qtd, nivel: rs.nivel, comissaoPct: rs.comissaoPct, comissaoValor: rs.comissaoValor, bonusPct: rs.bonusPct, bonusValor: rs.bonusValor, metaOk: rs.metaOk, calculadoEm: new Date().toISOString() };
+      const f = { ...ant, mes, total: rs.total, qtd: rs.qtd, nivel: rs.nivel, nivelMantido: rs.mantido, comissaoPct: rs.comissaoPct, comissaoValor: rs.comissaoValor, bonusPct: rs.bonusPct, bonusValor: rs.bonusValor, metaOk: rs.metaOk, calculadoEm: new Date().toISOString() };
       if (ant.creditoLancado) { f.bonusValor = ant.bonusValor; f.total = ant.total; f.nivel = ant.nivel; f.bonusPct = ant.bonusPct; }
       if (lancar && !ant.creditoLancado && f.bonusValor > 0) {
         try {
@@ -415,7 +422,7 @@ setInterval(async () => {
       try { await fecharMes(ant, true); } catch (e) { console.error("fechamento", e.message); }
       const c3 = await store.getConfig(); c3.__fechamentos = c3.__fechamentos || {}; c3.__fechamentos[ant] = { ...(c3.__fechamentos[ant] || {}), tentativas: (c3.__fechamentos[ant]?.tentativas || 0) + 1 }; await store.setConfig(c3);
     }
-    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); await sincronizarVendas(mesAtual()); }
+    if (Date.now() - ultimaSync > 6 * 3600e3) { ultimaSync = Date.now(); if (!c.__sync?.[ant]) await sincronizarVendas(ant); await sincronizarVendas(mesAtual()); }
   } catch (e) { console.error("agenda", e.message); }
 }, 20 * 60e3);
 
@@ -455,7 +462,7 @@ app.get("/api/admin/vendas", exigeAdmin, async (req, res) => {
 });
 app.post("/api/admin/vendas/sync", exigeAdmin, async (req, res) => {
   const mes = /^\d{4}-\d{2}$/.test(String(req.body?.mes || "")) ? req.body.mes : mesAtual();
-  try { res.json(await sincronizarVendas(mes)); } catch (e) { res.status(400).json({ erro: e.message }); }
+  try { const c = await store.getConfig(); if (!c.__sync?.[mesAnterior(mes)]) await sincronizarVendas(mesAnterior(mes)); res.json(await sincronizarVendas(mes)); } catch (e) { res.status(400).json({ erro: e.message }); }
 });
 app.post("/api/admin/fechamento", exigeAdmin, async (req, res) => {
   const mes = String(req.body?.mes || "");
